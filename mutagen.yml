@@ -1,0 +1,9 @@
+sync:
+  dpdk-ocl-test:
+    alpha: "."
+    beta: "work:dev/dpdk-sandbox/dpdk-ocl-test"
+    mode: "one-way-safe"
+    ignore:
+      vcs: true
+      paths:
+        - "target"

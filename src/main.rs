@@ -11,19 +11,8 @@ fn main() {
         ports: vec![
             capsule::config::PortConfig {
                 name: "testPort0".to_owned(),
-                device: "0000:00:08.0".to_owned(),
-                args: None,
-                cores: vec![dpdk::CoreId::new(0)],
-                rxd: 128,
-                txd: 128,
-                promiscuous: false,
-                multicast: true,
-                kni: false,
-            },
-            capsule::config::PortConfig {
-                name: "testPort1".to_owned(),
-                device: "0000:00:09.0".to_owned(),
-                args: None,
+                device: "net_pcap0".to_owned(),
+                args: Some("rx_pcap=input.pcap,tx_iface=lo".to_owned()),
                 cores: vec![dpdk::CoreId::new(0)],
                 rxd: 128,
                 txd: 128,
@@ -35,6 +24,7 @@ fn main() {
         dpdk_args: None,
         duration: None,
     };
+
 
     dpdk::eal_init(dbg!(conf.to_eal_args())).unwrap();
     println!("Hello, world!");
