@@ -27,5 +27,28 @@ fn main() {
 
 
     dpdk::eal_init(dbg!(conf.to_eal_args())).unwrap();
+
+    let src = r#"
+        __kernel void add(__global float* buffer, float scalar) {
+            buffer[get_global_id(0)] += scalar;
+        }
+    "#;
+
+    let pro_que = ocl::ProQue::builder()
+        .src(src)
+        .dims(1 << 20)
+        .build()
+        .unwrap();
+
+    let buf = pro_que.create_buffer::<f32>()
+        .unwrap();
+
+    let kernel = pro_que.kernel_builder("add")
+                        .arg(&buf)
+                        .arg(10f32)
+                        .build().unwrap();
+
+    unsafe { kernel.enq().unwrap(); }
+
     println!("Hello, world!");
 }
