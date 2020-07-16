@@ -8,13 +8,18 @@ fn get_mbuf_data(buf: &dpdk::Mbuf) -> &[u8] {
     }
 }
 
-fn write_to_buffer(in_pkts: &[dpdk::Mbuf], buf: &ocl::Buffer<u8>) -> ocl::EventList {
+fn write_to_buffer(in_pkts: &[dpdk::Mbuf], buf: &ocl::Buffer<u8>, offsets: &ocl::Buffer<usize>) -> ocl::EventList {
     let mut offset_so_far = 0;
     let mut evt_list = ocl::EventList::new();
-    for pkt in in_pkts {
+    for (idx, pkt) in in_pkts.iter().enumerate() {
         let data = get_mbuf_data(pkt);
         buf.write(data)
             .offset(offset_so_far)
+            .enew(&mut evt_list)
+            .enq()
+            .unwrap();
+        offsets.write(&[offset_so_far] as &[usize])
+            .offset(idx)
             .enew(&mut evt_list)
             .enq()
             .unwrap();
@@ -88,8 +93,12 @@ fn main() {
     let queue = ports.first().unwrap().queues().values().next().unwrap();
 
     let src = r#"
-        __kernel void add(__global uchar* buffer, uchar scalar) {
-            buffer[get_global_id(0)] = scalar;
+        __kernel void add(__global uchar* buffer, __global ulong* offsets, ulong len) {
+            if (get_global_id(0) >= len) {
+                return;
+            }
+
+            buffer[offsets[get_global_id(0)]] = 1;
         }
     "#;
 
@@ -100,21 +109,31 @@ fn main() {
         .unwrap();
 
     let buf = pro_que.create_buffer::<u8>().unwrap();
+    let offsets = pro_que.create_buffer::<usize>().unwrap();
 
     let msg = queue.receive();
 
-    let read_guard = write_to_buffer(&msg, &buf);
+    let read_guard = write_to_buffer(&msg, &buf, &offsets);
+
+    let mut res = vec![0; 10];
+    buf.read(&mut res).enq().unwrap();
+    println!("{:?}", res);
 
     let kernel = pro_que
         .kernel_builder("add")
         .arg(&buf)
-        .arg(10u8)
+        .arg(&offsets)
+        .arg(msg.len())
         .build()
         .unwrap();
 
     unsafe {
         kernel.cmd().ewait(&read_guard).enq().unwrap();
     }
+
+    let mut res = vec![0; 10];
+    buf.read(&mut res).enq().unwrap();
+    println!("{:?}", res);
 
     println!("flushing queue");
 
