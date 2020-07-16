@@ -186,7 +186,7 @@ pub struct RuntimeConfig {
 
 impl RuntimeConfig {
     /// Returns all the cores assigned to the runtime.
-    pub(crate) fn all_cores(&self) -> Vec<CoreId> {
+    pub fn all_cores(&self) -> Vec<CoreId> {
         let mut cores = vec![];
         cores.push(self.master_core);
         cores.extend(self.cores.iter());

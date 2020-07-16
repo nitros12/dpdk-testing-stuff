@@ -8,4 +8,4 @@ edition = "2018"
 
 [dependencies]
 ocl = "0.19.3"
-capsule = { path = "capsule/core/" }
+capsule = { path = "capsule/core/", features = [] }

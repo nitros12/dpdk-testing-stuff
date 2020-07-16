@@ -45,7 +45,7 @@ criterion = "0.3"
 proptest = { version = "0.9", default-features = false, features = ["default-code-coverage"] }
 
 [features]
-default = ["metrics"]
+default = []
 compile_failure = []    # compiler tests to check mutability rules are followed
 full = ["metrics", "pcap-dump", "testils"]
 metrics = ["metrics-core", "metrics-runtime"]
