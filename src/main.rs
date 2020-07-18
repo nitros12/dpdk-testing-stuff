@@ -92,37 +92,25 @@ fn main() {
 
     let queue = ports.first().unwrap().queues().values().next().unwrap();
 
-    let src = r#"
-        __kernel void add(__global uchar* buffer, __global ulong* offsets, ulong len) {
-            if (get_global_id(0) >= len) {
-                return;
-            }
-
-            buffer[offsets[get_global_id(0)]] = 1;
-        }
-    "#;
-
     let pro_que = ocl::ProQue::builder()
-        .src(src)
+        .src(std::include_str!("kernel.cl"))
         .dims(1 << 20)
         .build()
         .unwrap();
 
     let buf = pro_que.create_buffer::<u8>().unwrap();
     let offsets = pro_que.create_buffer::<usize>().unwrap();
+    let dest_ports = pro_que.create_buffer::<u32>().unwrap();
 
     let msg = queue.receive();
 
     let read_guard = write_to_buffer(&msg, &buf, &offsets);
 
-    let mut res = vec![0; 10];
-    buf.read(&mut res).enq().unwrap();
-    println!("{:?}", res);
-
     let kernel = pro_que
         .kernel_builder("add")
         .arg(&buf)
         .arg(&offsets)
+        .arg(&dest_ports)
         .arg(msg.len())
         .build()
         .unwrap();
@@ -131,9 +119,9 @@ fn main() {
         kernel.cmd().ewait(&read_guard).enq().unwrap();
     }
 
-    let mut res = vec![0; 10];
-    buf.read(&mut res).enq().unwrap();
-    println!("{:?}", res);
+    let mut dests = vec![0; msg.len()];
+    dest_ports.read(&mut dests).enq().unwrap();
+    println!("{:?}", dests);
 
     println!("flushing queue");
 
