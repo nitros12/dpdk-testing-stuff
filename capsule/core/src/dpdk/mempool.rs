@@ -34,6 +34,14 @@ pub struct Mempool {
     raw: NonNull<ffi::rte_mempool>,
 }
 
+// #[repr(C)]
+// struct GPUBuffer([u8; 0]);
+
+// #[repr(C)]
+// struct ExtMem {
+//     buf: NonNull<GPUBuffer>
+// }
+
 impl Mempool {
     /// Creates a new `Mempool` for `Mbuf`.
     ///
@@ -71,6 +79,30 @@ impl Mempool {
         info!("created {}.", name);
         Ok(Self { raw })
     }
+
+    fn new_gpu(capacity: usize, cache_size: usize, socket_id: SocketId) -> Fallible<Self> {
+        static MEMPOOL_COUNT: AtomicUsize = AtomicUsize::new(0);
+        let n = MEMPOOL_COUNT.fetch_add(1, Ordering::Relaxed);
+        let name = format!("mempool_gpu{}", n);
+
+        let raw = unsafe {
+            ffi::rte_pktmbuf_pool_create_extbuf(
+                name.clone().to_cstring().as_ptr(),
+                capacity as raw::c_uint,
+                cache_size as raw::c_uint,
+                0,
+                ffi::RTE_MBUF_DEFAULT_BUF_SIZE as u16,
+                socket_id.raw(),
+                0 as *const capsule_ffi::rte_pktmbuf_extmem,
+                0
+            )
+            .to_result(|_| DpdkError::new())?
+        };
+
+        info!("created {}.", name);
+        Ok(Self { raw })
+    }
+
 
     /// Returns the raw struct needed for FFI calls.
     #[inline]

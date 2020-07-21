@@ -1,5 +1,5 @@
 [package]
-name = "dpdk-ocl-test"
+name = "dpdk-gpu-test"
 version = "0.1.0"
 authors = ["Ben Simms <ben@bensimms.moe>"]
 edition = "2018"

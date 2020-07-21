@@ -1,0 +1,15 @@
+#+TITLE: DPDK GPU Notes
+
+* Notes
+** Papers
+- [[file:~/org/research_stuff/kaczmarski2018.pdf][GPU-R-Trie]]
+- [[file:~/org/research_stuff/1439-7321-1-PB.pdf][GPU perfect hashing]]
+
+** Docs
+*** RTE mbuf external buffers
+- https://doc.dpdk.org/api/rte__mbuf_8h.html
+- https://doc.dpdk.org/api/structrte__pktmbuf__extmem.html
+- https://doc.dpdk.org/api/rte__memory_8h.html#aab8198657eaa2ab71f82ea8f2abd8b94
+
+** PHF stuff
+http://cmph.sourceforge.net/chd.html
