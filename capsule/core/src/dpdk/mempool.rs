@@ -26,7 +26,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::os::raw;
 use std::ptr::{self, NonNull};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{ffi::c_void, sync::atomic::{AtomicUsize, Ordering}};
 
 /// A memory pool is an allocator of message buffers, or `Mbuf`. For best
 /// performance, each socket should have a dedicated `Mempool`.
@@ -80,21 +80,34 @@ impl Mempool {
         Ok(Self { raw })
     }
 
-    fn new_gpu(capacity: usize, cache_size: usize, socket_id: SocketId) -> Fallible<Self> {
+    pub fn new_external(bufs: &[*mut c_void], buf_len: usize, cache_size: usize, socket_id: SocketId) -> Fallible<Self> {
         static MEMPOOL_COUNT: AtomicUsize = AtomicUsize::new(0);
         let n = MEMPOOL_COUNT.fetch_add(1, Ordering::Relaxed);
-        let name = format!("mempool_gpu{}", n);
+        let name = format!("mempool_ext{}", n);
+
+        let mut extmems =
+            bufs.iter()
+                .cloned()
+                .map(|buf_ptr|
+                     ffi::rte_pktmbuf_extmem {
+                         buf_ptr,
+                         buf_iova: unsafe { ffi::rte_mem_virt2iova(buf_ptr) },
+                         buf_len: buf_len as u64,
+                         elt_size: ffi::RTE_MBUF_DEFAULT_BUF_SIZE as u16,
+                     }
+                )
+                .collect::<Vec<_>>();
 
         let raw = unsafe {
             ffi::rte_pktmbuf_pool_create_extbuf(
                 name.clone().to_cstring().as_ptr(),
-                capacity as raw::c_uint,
+                buf_len as raw::c_uint,
                 cache_size as raw::c_uint,
                 0,
                 ffi::RTE_MBUF_DEFAULT_BUF_SIZE as u16,
                 socket_id.raw(),
-                0 as *const capsule_ffi::rte_pktmbuf_extmem,
-                0
+                extmems.as_mut_ptr(),
+                extmems.len() as u32
             )
             .to_result(|_| DpdkError::new())?
         };

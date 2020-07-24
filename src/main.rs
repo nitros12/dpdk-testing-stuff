@@ -1,34 +1,51 @@
 use capsule::{dpdk, runtime::CoreMapBuilder};
-use std::collections::HashSet;
+use context::Context;
+use device::Device;
+use rustacuda::{
+    context::{self, ContextFlags},
+    device,
+    memory::{DeviceBuffer, UnifiedBuffer},
+    module::Module,
+    stream::{self, StreamFlags},
+    CudaFlags, launch,
+};
+use std::{collections::HashSet, error::Error, ffi::{CString, c_void}, env};
+use stream::Stream;
 
-fn get_mbuf_data(buf: &dpdk::Mbuf) -> &[u8] {
+fn get_mbuf_data(buf: &mut dpdk::Mbuf) -> &mut [u8] {
     unsafe {
         let ptr = buf.read_data_slice::<u8>(0, buf.data_len()).unwrap();
-        &*ptr.as_ptr()
+        &mut *ptr.as_ptr()
     }
 }
 
-fn write_to_buffer(in_pkts: &[dpdk::Mbuf], buf: &ocl::Buffer<u8>, offsets: &ocl::Buffer<usize>) -> ocl::EventList {
-    let mut offset_so_far = 0;
-    let mut evt_list = ocl::EventList::new();
-    for (idx, pkt) in in_pkts.iter().enumerate() {
-        let data = get_mbuf_data(pkt);
-        buf.write(data)
-            .offset(offset_so_far)
-            .enew(&mut evt_list)
-            .enq()
-            .unwrap();
-        offsets.write(&[offset_so_far] as &[usize])
-            .offset(idx)
-            .enew(&mut evt_list)
-            .enq()
-            .unwrap();
-        offset_so_far += pkt.data_len();
-    }
-    evt_list
+fn allocate_gpu_mempool(
+    capacity: usize,
+    cache_size: usize,
+    socket_id: dpdk::SocketId,
+) -> Result<capsule::dpdk::Mempool, Box<dyn Error>> {
+    let mut buf = UnifiedBuffer::new(&0u8, capacity)?;
+    let pool = dpdk::Mempool::new_external(
+        &[buf.as_mut_ptr() as *mut c_void],
+        capacity,
+        cache_size,
+        socket_id,
+    )?;
+    Ok(pool)
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
+    rustacuda::init(CudaFlags::empty())?;
+
+    let device = Device::get_device(0)?;
+
+    let context =
+        Context::create_and_push(ContextFlags::MAP_HOST | ContextFlags::SCHED_AUTO, device)?;
+
+    let ptx = CString::new(include_str!(concat!(env!("OUT_DIR"), "/kernel.ptx")))?;
+    let module = Module::load_from_string(&ptx)?;
+    let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;
+
     let conf = capsule::config::RuntimeConfig {
         app_name: "test".to_owned(),
         secondary: false,
@@ -51,7 +68,7 @@ fn main() {
         duration: None,
     };
 
-    dpdk::eal_init(dbg!(conf.to_eal_args())).unwrap();
+    dpdk::eal_init(conf.to_eal_args())?;
 
     let cores = conf.all_cores();
 
@@ -59,8 +76,9 @@ fn main() {
 
     let mut mempools = sockets
         .into_iter()
-        .map(|s| dpdk::Mempool::new(conf.mempool.capacity, conf.mempool.cache_size, s).unwrap())
-        .collect::<Vec<_>>();
+        // .map(|s| dpdk::Mempool::new(conf.mempool.capacity, conf.mempool.cache_size, s))
+        .map(|s| allocate_gpu_mempool(conf.mempool.capacity, conf.mempool.cache_size, s))
+        .collect::<Result<Vec<_>, _>>()?;
 
     // let core_map = CoreMapBuilder::new()
     //     .app_name(&conf.app_name)
@@ -74,60 +92,39 @@ fn main() {
         .ports
         .iter()
         .map(|p| {
-            dpdk::PortBuilder::new(p.name.clone(), p.device.clone())
-                .unwrap()
-                .cores(&p.cores)
-                .unwrap()
+            dpdk::PortBuilder::new(p.name.clone(), p.device.clone())?
+                .cores(&p.cores)?
                 .mempools(&mut mempools)
-                .rx_tx_queue_capacity(p.rxd, p.txd)
-                .unwrap()
+                .rx_tx_queue_capacity(p.rxd, p.txd)?
                 .finish(p.promiscuous, p.multicast, p.kni)
-                .unwrap()
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, _>>()?;
 
     for port in &mut ports {
-        port.start().unwrap();
+        port.start()?;
     }
 
     let queue = ports.first().unwrap().queues().values().next().unwrap();
 
-    let pro_que = ocl::ProQue::builder()
-        .src(std::include_str!("kernel.cl"))
-        .dims(1 << 20)
-        .build()
-        .unwrap();
-
-    let buf = pro_que.create_buffer::<u8>().unwrap();
-    let offsets = pro_que.create_buffer::<usize>().unwrap();
-    let dest_ports = pro_que.create_buffer::<u32>().unwrap();
-
-    let msg = queue.receive();
-
-    let read_guard = write_to_buffer(&msg, &buf, &offsets);
-
-    let kernel = pro_que
-        .kernel_builder("add")
-        .arg(&buf)
-        .arg(&offsets)
-        .arg(&dest_ports)
-        .arg(msg.len())
-        .build()
-        .unwrap();
+    // can we remove this allocation
+    let mut mbufs = queue.receive();
+    let pkts = mbufs.iter_mut().map(|m| get_mbuf_data(m).as_mut_ptr() as usize).collect::<Vec<_>>();
+    let mut output = UnifiedBuffer::new(&0u32, pkts.len())?;
+    let mut pkts_dev = unsafe { DeviceBuffer::from_slice_async(&pkts, &stream) }?;
 
     unsafe {
-        kernel.cmd().ewait(&read_guard).enq().unwrap();
+        launch!(module.perform<<<pkts.len() as u32, 1, 0, stream>>>(
+            pkts_dev.as_device_ptr(),
+            output.as_unified_ptr(),
+            pkts.len()
+        ))?;
     }
-
-    let mut dests = vec![0; msg.len()];
-    dest_ports.read(&mut dests).enq().unwrap();
-    println!("{:?}", dests);
-
-    println!("flushing queue");
-
-    pro_que.queue().finish().unwrap();
+   
+    stream.synchronize()?;
 
     println!("Hello, world!");
 
-    dpdk::eal_cleanup().unwrap();
+    dpdk::eal_cleanup()?;
+
+    Ok(())
 }
