@@ -1,15 +1,21 @@
-use capsule::{dpdk, runtime::CoreMapBuilder};
+use capsule::dpdk;
 use context::Context;
 use device::Device;
 use rustacuda::{
     context::{self, ContextFlags},
-    device,
+    device, launch,
     memory::{DeviceBuffer, UnifiedBuffer},
     module::Module,
     stream::{self, StreamFlags},
-    CudaFlags, launch,
+    CudaFlags,
 };
-use std::{collections::HashSet, error::Error, ffi::{CString, c_void}, env};
+use std::{
+    collections::HashSet,
+    env,
+    error::Error,
+    ffi::{c_void, CString},
+    sync::atomic::{AtomicUsize, Ordering},
+};
 use stream::Stream;
 
 fn get_mbuf_data(buf: &mut dpdk::Mbuf) -> &mut [u8] {
@@ -19,27 +25,62 @@ fn get_mbuf_data(buf: &mut dpdk::Mbuf) -> &mut [u8] {
     }
 }
 
+// https://github.com/DPDK/dpdk/blob/master/app/test-pmd/testpmd.c#L614
+fn calc_total_pages(capacity: usize, mbuf_size: usize, page_size: usize) -> usize {
+    let header_len = 128 << 20;
+
+    let obj_size = dpdk::calc_object_size(mbuf_size as u32, 0) as usize;
+
+    let mbuf_per_page = page_size / obj_size;
+    let leftover = (capacity % mbuf_per_page) > 0;
+    let n_pages = (capacity / mbuf_per_page) + leftover as usize;
+
+    let mbuf_mem = n_pages * page_size;
+
+    let total_mem_unaligned = mbuf_mem + header_len;
+    let total_pages = (total_mem_unaligned + page_size - 1) / page_size;
+
+    total_pages
+}
+
 fn allocate_gpu_mempool(
     capacity: usize,
     cache_size: usize,
-    socket_id: dpdk::SocketId,
-) -> Result<capsule::dpdk::Mempool, Box<dyn Error>> {
-    let mut buf = UnifiedBuffer::new(&0u8, capacity)?;
-    let pool = dpdk::Mempool::new_external(
-        &[buf.as_mut_ptr() as *mut c_void],
-        capacity,
-        cache_size,
-        socket_id,
-    )?;
-    Ok(pool)
+) -> Result<((UnifiedBuffer<u8>, dpdk::SocketId), capsule::dpdk::Mempool), Box<dyn Error>> {
+    static CUDA_HEAP_COUNT: AtomicUsize = AtomicUsize::new(0);
+    let n = CUDA_HEAP_COUNT.fetch_add(1, Ordering::Relaxed);
+    let heap_name = format!("cuda_heap{}", n);
+    dpdk::create_heap(&heap_name)?;
+
+    let mbuf_size = capsule::ffi::RTE_MBUF_DEFAULT_BUF_SIZE as usize;
+
+    // assume we're using normal size pages for now.
+    let page_size = page_size::get();
+    let num_pages = calc_total_pages(capacity, mbuf_size, page_size);
+    let len = num_pages * page_size;
+
+    println!("allocating unified buffers of total len: {} (num_pages: {}, page_size: {})", len, num_pages, page_size);
+
+    let mut buf = UnifiedBuffer::new(&0u8, len)?;
+    let buf_ptr = buf.as_mut_ptr() as *mut c_void;
+
+    dpdk::add_heap_memory(&heap_name, buf_ptr, len, num_pages, page_size)?;
+
+    let heap_socket = dpdk::SocketId::of_heap(&heap_name)?;
+
+    let pool = dpdk::Mempool::new(capacity, cache_size, heap_socket)?;
+    println!("allocated pool");
+    Ok(((buf, heap_socket), pool))
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main_inner() -> Result<(), Box<dyn Error>> {
+    simple_logger::init().unwrap();
+
     rustacuda::init(CudaFlags::empty())?;
 
     let device = Device::get_device(0)?;
 
-    let context =
+    let _context =
         Context::create_and_push(ContextFlags::MAP_HOST | ContextFlags::SCHED_AUTO, device)?;
 
     let ptx = CString::new(include_str!(concat!(env!("OUT_DIR"), "/kernel.ptx")))?;
@@ -74,11 +115,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let sockets = cores.iter().map(|c| c.socket_id()).collect::<HashSet<_>>();
 
-    let mut mempools = sockets
+    let (bufs_and_sockets, mut mempools): (Vec<_>, Vec<_>) = sockets
         .into_iter()
         // .map(|s| dpdk::Mempool::new(conf.mempool.capacity, conf.mempool.cache_size, s))
-        .map(|s| allocate_gpu_mempool(conf.mempool.capacity, conf.mempool.cache_size, s))
-        .collect::<Result<Vec<_>, _>>()?;
+        .map(|_s| allocate_gpu_mempool(conf.mempool.capacity, conf.mempool.cache_size))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .unzip();
+
+    let (_bufs, sockets): (Vec<_>, Vec<_>) = bufs_and_sockets.into_iter().unzip();
 
     // let core_map = CoreMapBuilder::new()
     //     .app_name(&conf.app_name)
@@ -88,17 +133,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     //     .finish()
     //     .unwrap();
 
+    let extra_heap_mappings = sockets.iter().cloned().zip(cores.iter().map(|c| c.socket_id()))
+        .collect::<Vec<_>>();
+
     let mut ports = conf
         .ports
         .iter()
         .map(|p| {
             dpdk::PortBuilder::new(p.name.clone(), p.device.clone())?
                 .cores(&p.cores)?
-                .mempools(&mut mempools)
+                .mempools(&mut mempools, &extra_heap_mappings)
                 .rx_tx_queue_capacity(p.rxd, p.txd)?
                 .finish(p.promiscuous, p.multicast, p.kni)
         })
         .collect::<Result<Vec<_>, _>>()?;
+
+    println!("starting ports");
 
     for port in &mut ports {
         port.start()?;
@@ -106,11 +156,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let queue = ports.first().unwrap().queues().values().next().unwrap();
 
+    println!("receiving packets");
+
     // can we remove this allocation
     let mut mbufs = queue.receive();
-    let pkts = mbufs.iter_mut().map(|m| get_mbuf_data(m).as_mut_ptr() as usize).collect::<Vec<_>>();
+
+    println!("received packets");
+
+    let pkts = mbufs
+        .iter_mut()
+        .map(|m| get_mbuf_data(m).as_mut_ptr() as usize)
+        .collect::<Vec<_>>();
     let mut output = UnifiedBuffer::new(&0u32, pkts.len())?;
     let mut pkts_dev = unsafe { DeviceBuffer::from_slice_async(&pkts, &stream) }?;
+
+    println!("running kernel, pkts len: {}", pkts.len());
 
     unsafe {
         launch!(module.perform<<<pkts.len() as u32, 1, 0, stream>>>(
@@ -119,12 +179,29 @@ fn main() -> Result<(), Box<dyn Error>> {
             pkts.len()
         ))?;
     }
-   
+
     stream.synchronize()?;
 
-    println!("Hello, world!");
+    println!("done");
+
+    for port in &mut ports {
+        port.stop();
+    }
+
+    drop(ports);
+    drop(mempools);
 
     dpdk::eal_cleanup()?;
+
+    println!("closed dpdk");
+
+    Ok(())
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    main_inner()?;
+
+    println!("Closing up");
 
     Ok(())
 }

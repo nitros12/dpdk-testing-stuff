@@ -10,3 +10,7 @@ edition = "2018"
 capsule = { path = "capsule/core/", features = [] }
 rustacuda = "0.1.2"
 rustacuda_core = "0.1.2"
+page_size = "0.4.2"
+# tracing-log = { version = "0.1.1", features = ["env_logger"] }
+tracing = { version = "0.1.17", features = ["log", "log-always"] }
+simple_logger = "1.6.0"

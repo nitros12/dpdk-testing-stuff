@@ -490,8 +490,8 @@ impl<'a> PortBuilder<'a> {
     }
 
     /// Sets the available mempools.
-    pub fn mempools(&'a mut self, mempools: &'a mut [Mempool]) -> &'a mut Self {
-        self.mempools = MempoolMap::new(mempools);
+    pub fn mempools(&'a mut self, mempools: &'a mut [Mempool], extra_mappings: &[(SocketId, SocketId)]) -> &'a mut Self {
+        self.mempools = MempoolMap::new(mempools, extra_mappings);
         self
     }
 

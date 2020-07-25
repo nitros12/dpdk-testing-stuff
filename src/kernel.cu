@@ -1,4 +1,5 @@
-#include <cstdint>
+#include <stdint.h>
+#include <stdio.h>
 
 // todo: we can use deltas instead of offsets, and have the compiler try and
 // pack close entries together
@@ -9,10 +10,10 @@ struct trie_entry {
 };
 
 __constant__ struct trie_entry entries[] = {
-  [0] = (struct trie_entry){.next_if_t = 2, .next_if_f = 1, .dest_port = 0},
+    [0] = (struct trie_entry){.next_if_t = 2, .next_if_f = 1, .dest_port = 0},
 
-  [1] = (struct trie_entry){.next_if_t = 1, .next_if_f = 1, .dest_port = 1},
-  [2] = (struct trie_entry){.next_if_t = 2, .next_if_f = 2, .dest_port = 2},
+    [1] = (struct trie_entry){.next_if_t = 1, .next_if_f = 1, .dest_port = 1},
+    [2] = (struct trie_entry){.next_if_t = 2, .next_if_f = 2, .dest_port = 2},
 };
 
 __device__ uint32_t update_match_state(uint8_t ip_segment, uint32_t state) {
@@ -23,7 +24,7 @@ __device__ uint32_t update_match_state(uint8_t ip_segment, uint32_t state) {
   return state;
 }
 
-__global__ void perform(const uint8_t **pkt, uint32_t *dest_port, int count) {
+extern "C" __global__ void perform(const uint8_t **pkt, uint32_t *dest_port, int count) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= count) {
     return;
@@ -39,6 +40,8 @@ __global__ void perform(const uint8_t **pkt, uint32_t *dest_port, int count) {
   lpm_state = update_match_state(b, lpm_state);
   lpm_state = update_match_state(c, lpm_state);
   lpm_state = update_match_state(d, lpm_state);
+
+  printf("ip: %d.%d.%d.%d, port: %d\n", a, b, c, d, entries[lpm_state].dest_port);
 
   dest_port[i] = entries[lpm_state].dest_port;
 }

@@ -16,7 +16,7 @@
 * SPDX-License-Identifier: Apache-2.0
 */
 
-pub(crate) use capsule_ffi::*;
+pub use capsule_ffi::*;
 
 use crate::warn;
 use failure::{Fail, Fallible};

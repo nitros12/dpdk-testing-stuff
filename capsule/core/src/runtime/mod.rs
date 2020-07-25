@@ -118,7 +118,7 @@ impl Runtime {
         for conf in config.ports.iter() {
             let port = PortBuilder::new(conf.name.clone(), conf.device.clone())?
                 .cores(&conf.cores)?
-                .mempools(&mut mempools)
+                .mempools(&mut mempools, &[])
                 .rx_tx_queue_capacity(conf.rxd, conf.txd)?
                 .finish(conf.promiscuous, conf.multicast, conf.kni)?;
 

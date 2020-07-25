@@ -26,7 +26,10 @@ use std::collections::HashMap;
 use std::fmt;
 use std::os::raw;
 use std::ptr::{self, NonNull};
-use std::{ffi::c_void, sync::atomic::{AtomicUsize, Ordering}};
+use std::{
+    ffi::c_void,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 /// A memory pool is an allocator of message buffers, or `Mbuf`. For best
 /// performance, each socket should have a dedicated `Mempool`.
@@ -80,42 +83,42 @@ impl Mempool {
         Ok(Self { raw })
     }
 
-    pub fn new_external(bufs: &[*mut c_void], buf_len: usize, cache_size: usize, socket_id: SocketId) -> Fallible<Self> {
-        static MEMPOOL_COUNT: AtomicUsize = AtomicUsize::new(0);
-        let n = MEMPOOL_COUNT.fetch_add(1, Ordering::Relaxed);
-        let name = format!("mempool_ext{}", n);
+    // pub fn new_external(bufs: &[*mut c_void], capacity: usize, cache_size: usize, socket_id: SocketId) -> Fallible<Self> {
+    //     static MEMPOOL_COUNT: AtomicUsize = AtomicUsize::new(0);
+    //     let n = MEMPOOL_COUNT.fetch_add(1, Ordering::Relaxed);
+    //     let name = format!("mempool_ext{}", n);
 
-        let mut extmems =
-            bufs.iter()
-                .cloned()
-                .map(|buf_ptr|
-                     ffi::rte_pktmbuf_extmem {
-                         buf_ptr,
-                         buf_iova: unsafe { ffi::rte_mem_virt2iova(buf_ptr) },
-                         buf_len: buf_len as u64,
-                         elt_size: ffi::RTE_MBUF_DEFAULT_BUF_SIZE as u16,
-                     }
-                )
-                .collect::<Vec<_>>();
+    //     let buf_len = capacity * ffi::RTE_MBUF_DEFAULT_BUF_SIZE as usize;
+    //     let mut extmems =
+    //         bufs.iter()
+    //             .cloned()
+    //             .map(|buf_ptr|
+    //                  ffi::rte_pktmbuf_extmem {
+    //                      buf_ptr,
+    //                      buf_iova: unsafe { ffi::rte_mem_virt2iova(buf_ptr) },
+    //                      buf_len: buf_len as u64,
+    //                      elt_size: ffi::RTE_MBUF_DEFAULT_BUF_SIZE as u16,
+    //                  }
+    //             )
+    //             .collect::<Vec<_>>();
 
-        let raw = unsafe {
-            ffi::rte_pktmbuf_pool_create_extbuf(
-                name.clone().to_cstring().as_ptr(),
-                buf_len as raw::c_uint,
-                cache_size as raw::c_uint,
-                0,
-                ffi::RTE_MBUF_DEFAULT_BUF_SIZE as u16,
-                socket_id.raw(),
-                extmems.as_mut_ptr(),
-                extmems.len() as u32
-            )
-            .to_result(|_| DpdkError::new())?
-        };
+    //     let raw = unsafe {
+    //         ffi::rte_pktmbuf_pool_create_extbuf(
+    //             name.clone().to_cstring().as_ptr(),
+    //             capacity as raw::c_uint,
+    //             cache_size as raw::c_uint,
+    //             0,
+    //             ffi::RTE_MBUF_DEFAULT_BUF_SIZE as u16,
+    //             socket_id.raw(),
+    //             extmems.as_mut_ptr(),
+    //             extmems.len() as u32
+    //         )
+    //         .to_result(|_| DpdkError::new())?
+    //     };
 
-        info!("created {}.", name);
-        Ok(Self { raw })
-    }
-
+    //     info!("created {}.", name);
+    //     Ok(Self { raw })
+    // }
 
     /// Returns the raw struct needed for FFI calls.
     #[inline]
@@ -153,6 +156,16 @@ impl fmt::Debug for Mempool {
     }
 }
 
+pub fn calc_object_size(elem_size: u32, flags: u32) -> u32 {
+    unsafe {
+        ffi::rte_mempool_calc_obj_size(
+            elem_size,
+            flags,
+            ptr::null::<ffi::rte_mempool_objsz>() as *mut _,
+        )
+    }
+}
+
 impl Drop for Mempool {
     fn drop(&mut self) {
         debug!("freeing {}.", self.name());
@@ -185,11 +198,12 @@ pub enum MempoolError {
 #[derive(Debug)]
 pub struct MempoolMap<'a> {
     inner: HashMap<SocketId, &'a mut Mempool>,
+    extra_mappings: HashMap<SocketId, SocketId>,
 }
 
 impl<'a> MempoolMap<'a> {
     /// Creates a new map from a mutable slice.
-    pub fn new(mempools: &'a mut [Mempool]) -> Self {
+    pub fn new(mempools: &'a mut [Mempool], extra_mappings: &[(SocketId, SocketId)]) -> Self {
         let map = mempools
             .iter_mut()
             .map(|pool| {
@@ -198,7 +212,12 @@ impl<'a> MempoolMap<'a> {
             })
             .collect::<HashMap<_, _>>();
 
-        Self { inner: map }
+        let extras = extra_mappings.into_iter().cloned().collect();
+
+        Self {
+            inner: map,
+            extra_mappings: extras,
+        }
     }
 
     /// Returns a mutable reference to the raw mempool corresponding to the
@@ -208,8 +227,17 @@ impl<'a> MempoolMap<'a> {
     ///
     /// If the value is not found, `MempoolError::NotFound` is returned.
     pub fn get_raw(&mut self, socket_id: SocketId) -> Fallible<&mut ffi::rte_mempool> {
+        let potential_alt = self.extra_mappings.get(&socket_id).cloned();
+
+        let sid = match (self.inner.contains_key(&socket_id), potential_alt) {
+            (True, _) => socket_id,
+            (_, Some(s)) => s,
+            _ => return Err(MempoolError::NotFound(socket_id).into()),
+        };
+
+
         self.inner
-            .get_mut(&socket_id)
+            .get_mut(&sid)
             .ok_or_else(|| MempoolError::NotFound(socket_id).into())
             .map(|pool| pool.raw_mut())
     }
@@ -219,6 +247,7 @@ impl<'a> Default for MempoolMap<'a> {
     fn default() -> MempoolMap<'a> {
         MempoolMap {
             inner: HashMap::new(),
+            extra_mappings: HashMap::new(),
         }
     }
 }

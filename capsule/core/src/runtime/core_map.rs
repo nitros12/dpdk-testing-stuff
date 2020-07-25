@@ -207,7 +207,7 @@ impl<'a> CoreMapBuilder<'a> {
     }
 
     pub fn mempools(&'a mut self, mempools: &'a mut [Mempool]) -> &'a mut Self {
-        self.mempools = MempoolMap::new(mempools);
+        self.mempools = MempoolMap::new(mempools, &[]);
         self
     }
 
