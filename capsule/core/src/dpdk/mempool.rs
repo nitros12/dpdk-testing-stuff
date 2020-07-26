@@ -168,11 +168,13 @@ pub fn calc_object_size(elem_size: u32, flags: u32) -> u32 {
 
 impl Drop for Mempool {
     fn drop(&mut self) {
-        debug!("freeing {}.", self.name());
+        // debug!("freeing {}.", self.name());
 
-        unsafe {
-            ffi::rte_mempool_free(self.raw_mut());
-        }
+        println!("freeing mempool");
+
+        // unsafe {
+        //     ffi::rte_mempool_free(self.raw_mut());
+        // }
     }
 }
 
@@ -230,11 +232,10 @@ impl<'a> MempoolMap<'a> {
         let potential_alt = self.extra_mappings.get(&socket_id).cloned();
 
         let sid = match (self.inner.contains_key(&socket_id), potential_alt) {
-            (True, _) => socket_id,
+            (true, _) => socket_id,
             (_, Some(s)) => s,
             _ => return Err(MempoolError::NotFound(socket_id).into()),
         };
-
 
         self.inner
             .get_mut(&sid)

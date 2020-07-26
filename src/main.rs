@@ -59,7 +59,10 @@ fn allocate_gpu_mempool(
     let num_pages = calc_total_pages(capacity, mbuf_size, page_size);
     let len = num_pages * page_size;
 
-    println!("allocating unified buffers of total len: {} (num_pages: {}, page_size: {})", len, num_pages, page_size);
+    println!(
+        "allocating unified buffers of total len: {} (num_pages: {}, page_size: {})",
+        len, num_pages, page_size
+    );
 
     let mut buf = UnifiedBuffer::new(&0u8, len)?;
     let buf_ptr = buf.as_mut_ptr() as *mut c_void;
@@ -123,7 +126,7 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
         .into_iter()
         .unzip();
 
-    let (_bufs, sockets): (Vec<_>, Vec<_>) = bufs_and_sockets.into_iter().unzip();
+    let (bufs, sockets): (Vec<_>, Vec<_>) = bufs_and_sockets.into_iter().unzip();
 
     // let core_map = CoreMapBuilder::new()
     //     .app_name(&conf.app_name)
@@ -133,7 +136,10 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
     //     .finish()
     //     .unwrap();
 
-    let extra_heap_mappings = sockets.iter().cloned().zip(cores.iter().map(|c| c.socket_id()))
+    let extra_heap_mappings = cores
+        .iter()
+        .map(|c| c.socket_id())
+        .zip(sockets.iter().cloned())
         .collect::<Vec<_>>();
 
     let mut ports = conf
@@ -188,6 +194,7 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
         port.stop();
     }
 
+    drop(bufs);
     drop(ports);
     drop(mempools);
 
