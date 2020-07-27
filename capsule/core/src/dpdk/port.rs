@@ -169,6 +169,27 @@ impl PortQueue {
         }
     }
 
+    pub fn receive_into(&self, temp: &mut Vec<*mut ()>, dest: &mut Vec<Mbuf>, limit: u16) {
+        temp.clear();
+        dest.clear();
+        temp.reserve(limit as usize);
+        dest.reserve(limit as usize);
+
+        let len = unsafe {
+            ffi::_rte_eth_rx_burst(
+                self.port_id.0,
+                self.rxq.0,
+                temp.as_mut_ptr() as *mut _,
+                limit,
+            )
+        };
+
+        unsafe {
+            temp.set_len(len as usize);
+            dest.extend(temp.into_iter().map(|ptr| Mbuf::from_ptr(*ptr as *mut _)));
+        }
+    }
+
     /// Sends the packets to the transmit queue.
     pub fn transmit(&self, packets: Vec<Mbuf>) {
         let mut ptrs = packets.into_iter().map(Mbuf::into_ptr).collect::<Vec<_>>();
@@ -490,19 +511,18 @@ impl<'a> PortBuilder<'a> {
     }
 
     /// Sets the available mempools.
-    pub fn mempools(&'a mut self, mempools: &'a mut [Mempool], extra_mappings: &[(SocketId, SocketId)]) -> &'a mut Self {
+    pub fn mempools(
+        &'a mut self,
+        mempools: &'a mut [Mempool],
+        extra_mappings: &[(SocketId, SocketId)],
+    ) -> &'a mut Self {
         self.mempools = MempoolMap::new(mempools, extra_mappings);
         self
     }
 
     /// Creates the `Port`.
     #[allow(clippy::cognitive_complexity)]
-    pub fn finish(
-        &mut self,
-        promiscuous: bool,
-        multicast: bool,
-        with_kni: bool,
-    ) -> Fallible<Port> {
+    pub fn finish(&mut self, promiscuous: bool, multicast: bool, with_kni: bool) -> Fallible<Port> {
         let len = self.cores.len() as u16;
         let mut conf = ffi::rte_eth_conf::default();
 

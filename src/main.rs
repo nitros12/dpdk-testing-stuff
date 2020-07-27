@@ -3,27 +3,19 @@ use context::Context;
 use device::Device;
 use rustacuda::{
     context::{self, ContextFlags},
-    device, launch,
-    memory::{DeviceBuffer, UnifiedBuffer},
-    module::Module,
-    stream::{self, StreamFlags},
+    device,
+    memory::UnifiedBuffer,
     CudaFlags,
 };
 use std::{
     collections::HashSet,
-    env,
     error::Error,
-    ffi::{c_void, CString},
+    ffi::c_void,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use stream::Stream;
 
-fn get_mbuf_data(buf: &mut dpdk::Mbuf) -> &mut [u8] {
-    unsafe {
-        let ptr = buf.read_data_slice::<u8>(0, buf.data_len()).unwrap();
-        &mut *ptr.as_ptr()
-    }
-}
+
+mod coordinator;
 
 // https://github.com/DPDK/dpdk/blob/master/app/test-pmd/testpmd.c#L614
 fn calc_total_pages(capacity: usize, mbuf_size: usize, page_size: usize) -> usize {
@@ -67,6 +59,8 @@ fn allocate_gpu_mempool(
     let mut buf = UnifiedBuffer::new(&0u8, len)?;
     let buf_ptr = buf.as_mut_ptr() as *mut c_void;
 
+    println!("allocated unified memory, adding to dpdk");
+
     dpdk::add_heap_memory(&heap_name, buf_ptr, len, num_pages, page_size)?;
 
     let heap_socket = dpdk::SocketId::of_heap(&heap_name)?;
@@ -85,10 +79,6 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
 
     let _context =
         Context::create_and_push(ContextFlags::MAP_HOST | ContextFlags::SCHED_AUTO, device)?;
-
-    let ptx = CString::new(include_str!(concat!(env!("OUT_DIR"), "/kernel.ptx")))?;
-    let module = Module::load_from_string(&ptx)?;
-    let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;
 
     let conf = capsule::config::RuntimeConfig {
         app_name: "test".to_owned(),
@@ -128,14 +118,6 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
 
     let (bufs, sockets): (Vec<_>, Vec<_>) = bufs_and_sockets.into_iter().unzip();
 
-    // let core_map = CoreMapBuilder::new()
-    //     .app_name(&conf.app_name)
-    //     .cores(&cores)
-    //     .master_core(conf.master_core)
-    //     .mempools(&mut mempools)
-    //     .finish()
-    //     .unwrap();
-
     let extra_heap_mappings = cores
         .iter()
         .map(|c| c.socket_id())
@@ -160,33 +142,15 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
         port.start()?;
     }
 
+    let coordinator = coordinator::Coordinator::new(64, 1)?;
+
     let queue = ports.first().unwrap().queues().values().next().unwrap();
 
     println!("receiving packets");
 
-    // can we remove this allocation
-    let mut mbufs = queue.receive();
+    coordinator.process_packets(queue)?;
 
-    println!("received packets");
-
-    let pkts = mbufs
-        .iter_mut()
-        .map(|m| get_mbuf_data(m).as_mut_ptr() as usize)
-        .collect::<Vec<_>>();
-    let mut output = UnifiedBuffer::new(&0u32, pkts.len())?;
-    let mut pkts_dev = unsafe { DeviceBuffer::from_slice_async(&pkts, &stream) }?;
-
-    println!("running kernel, pkts len: {}", pkts.len());
-
-    unsafe {
-        launch!(module.perform<<<pkts.len() as u32, 1, 0, stream>>>(
-            pkts_dev.as_device_ptr(),
-            output.as_unified_ptr(),
-            pkts.len()
-        ))?;
-    }
-
-    stream.synchronize()?;
+    coordinator.close();
 
     println!("done");
 

@@ -24,11 +24,19 @@ __device__ uint32_t update_match_state(uint8_t ip_segment, uint32_t state) {
   return state;
 }
 
-extern "C" __global__ void perform(const uint8_t **pkt, uint32_t *dest_port, int count) {
+extern "C" __global__ void perform(const volatile uint8_t **pkt, uint32_t *dest_port, int count) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= count) {
     return;
   }
+
+  __threadfence_system();
+
+  // this gets offset by 64 words for some reason
+  pkt += 64;
+  dest_port += 64;
+
+  printf("hi i am thread: %d, packets are at: %p, my packet is at: %p\n", i, pkt, pkt[i]);
 
   uint8_t a = pkt[i][30];
   uint8_t b = pkt[i][31];
