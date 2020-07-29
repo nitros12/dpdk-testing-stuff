@@ -24,7 +24,7 @@ __device__ uint32_t update_match_state(uint8_t ip_segment, uint32_t state) {
   return state;
 }
 
-extern "C" __global__ void perform(const volatile uint8_t **pkt, uint32_t *dest_port, int count) {
+extern "C" __global__ void perform(volatile uint32_t *dest_port, const volatile uint8_t **pkt, int count) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= count) {
     return;
@@ -32,11 +32,7 @@ extern "C" __global__ void perform(const volatile uint8_t **pkt, uint32_t *dest_
 
   __threadfence_system();
 
-  // this gets offset by 64 words for some reason
-  pkt += 64;
-  dest_port += 64;
-
-  printf("hi i am thread: %d, packets are at: %p, my packet is at: %p\n", i, pkt, pkt[i]);
+  // printf("hi i am thread: %d, packets are at: %p, my packet is at: %p, dst buf at: %p\n", i, pkt, pkt[i], dest_port);
 
   uint8_t a = pkt[i][30];
   uint8_t b = pkt[i][31];
@@ -49,7 +45,9 @@ extern "C" __global__ void perform(const volatile uint8_t **pkt, uint32_t *dest_
   lpm_state = update_match_state(c, lpm_state);
   lpm_state = update_match_state(d, lpm_state);
 
-  printf("ip: %d.%d.%d.%d, port: %d\n", a, b, c, d, entries[lpm_state].dest_port);
+  // printf("pkt: %d: ip: %d.%d.%d.%d, port: %d\n", i, a, b, c, d, entries[lpm_state].dest_port);
 
   dest_port[i] = entries[lpm_state].dest_port;
+
+  // printf("packet %d finished\n", i);
 }

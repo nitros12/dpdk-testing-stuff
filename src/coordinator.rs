@@ -19,11 +19,10 @@ impl Worker {
         pq.receive_into(&mut self.temp_buf, &mut self.mbufs, self.max_capacity);
 
         for (idx, pkt) in self.mbufs.iter().enumerate() {
-            println!("idx: {}", idx);
             self.pkt_ptr_buf[idx] = get_mbuf_data(pkt).as_ptr() as usize;
         }
 
-        println!("pkt_ptr_buf: {:?} {:?}", self.pkt_ptr_buf.as_unified_ptr(), &self.pkt_ptr_buf[0..self.mbufs.len()]);
+        // println!("pkt_ptr_buf: {:?} {:?}", self.pkt_ptr_buf.as_unified_ptr(), &self.pkt_ptr_buf[0..self.mbufs.len()]);
     }
 
     fn split_data(&mut self) -> (&Stream, &mut UnifiedBuffer<u32>, &mut UnifiedBuffer<usize>, usize) {
@@ -81,7 +80,7 @@ impl Coordinator {
         Ok(Coordinator { workers, returner, module })
     }
 
-    pub fn process_packets(&self, pq: &PortQueue) -> Result<(), Box<dyn Error>> {
+    pub fn process_packets(&self, pq: &PortQueue) -> Result<usize, Box<dyn Error>> {
         let mut worker = self.workers.recv()?;
 
         worker.recv(pq);
@@ -101,8 +100,6 @@ impl Coordinator {
         let s_c = worker.stream.clone();
         let ret = self.returner.clone();
         s_c.add_callback(Box::new(move |s: Result<(), rustacuda::error::CudaError>| {
-            println!("Status: {:?}", s);
-
             // TODO: send packets
 
             // return the worker to the pool
@@ -110,7 +107,7 @@ impl Coordinator {
         }))?;
 
 
-        Ok(())
+        Ok(pkt_len)
     }
 
     /// make sure this is called, otherwise things will explode

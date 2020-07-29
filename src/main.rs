@@ -11,7 +11,7 @@ use std::{
     collections::HashSet,
     error::Error,
     ffi::c_void,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicUsize, Ordering}, time::Instant,
 };
 
 
@@ -71,7 +71,7 @@ fn allocate_gpu_mempool(
 }
 
 fn main_inner() -> Result<(), Box<dyn Error>> {
-    simple_logger::init().unwrap();
+    // simple_logger::init().unwrap();
 
     rustacuda::init(CudaFlags::empty())?;
 
@@ -90,7 +90,7 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
         ports: vec![capsule::config::PortConfig {
             name: "testPort0".to_owned(),
             device: "net_pcap0".to_owned(),
-            args: Some("rx_pcap=input.pcap,tx_iface=lo".to_owned()),
+            args: Some("rx_pcap=dump.pcap,tx_iface=lo".to_owned()),
             cores: vec![dpdk::CoreId::new(0)],
             rxd: 128,
             txd: 128,
@@ -142,17 +142,33 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
         port.start()?;
     }
 
-    let coordinator = coordinator::Coordinator::new(64, 1)?;
+
+    let packet_buf_size = 512;
+
+    let coordinator = coordinator::Coordinator::new(packet_buf_size, 40)?;
 
     let queue = ports.first().unwrap().queues().values().next().unwrap();
 
     println!("receiving packets");
 
-    coordinator.process_packets(queue)?;
+    let start_t = Instant::now();
+    let mut total_pkts = 0;
+
+    loop {
+        let n_pkts = coordinator.process_packets(queue)?;
+
+        total_pkts += n_pkts;
+
+        if n_pkts < packet_buf_size {
+            break;
+        }
+    }
 
     coordinator.close();
 
-    println!("done");
+    let end_t = Instant::now();
+
+    println!("done, took: {:?}, {} packets", end_t.duration_since(start_t), total_pkts);
 
     for port in &mut ports {
         port.stop();
