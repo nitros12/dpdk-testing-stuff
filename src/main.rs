@@ -1,85 +1,85 @@
-use capsule::dpdk;
-use context::Context;
-use device::Device;
-use rustacuda::{
-    context::{self, ContextFlags},
-    device,
-    memory::UnifiedBuffer,
-    CudaFlags,
-};
+use capsule::{dpdk, Mbuf, PortQueue};
 use std::{
     collections::HashSet,
     error::Error,
     ffi::c_void,
-    sync::atomic::{AtomicUsize, Ordering}, time::Instant,
+    sync::atomic::{AtomicUsize, Ordering},
+    time::Instant,
 };
 
-
-mod coordinator;
-
-// https://github.com/DPDK/dpdk/blob/master/app/test-pmd/testpmd.c#L614
-fn calc_total_pages(capacity: usize, mbuf_size: usize, page_size: usize) -> usize {
-    let header_len = 128 << 20;
-
-    let obj_size = dpdk::calc_object_size(mbuf_size as u32, 0) as usize;
-
-    let mbuf_per_page = page_size / obj_size;
-    let leftover = (capacity % mbuf_per_page) > 0;
-    let n_pages = (capacity / mbuf_per_page) + leftover as usize;
-
-    let mbuf_mem = n_pages * page_size;
-
-    let total_mem_unaligned = mbuf_mem + header_len;
-    let total_pages = (total_mem_unaligned + page_size - 1) / page_size;
-
-    total_pages
+#[link(name = "kernel", kind = "static")]
+extern "C" {
+    fn p4_process(
+        pkts: *const *mut u8,
+        lengths: *const u64,
+        lengths_out: *mut u64,
+        out_offsets: *mut u64,
+        pkt_count: u64,
+        i: u64,
+    );
 }
 
-fn allocate_gpu_mempool(
-    capacity: usize,
-    cache_size: usize,
-) -> Result<((UnifiedBuffer<u8>, dpdk::SocketId), capsule::dpdk::Mempool), Box<dyn Error>> {
-    static CUDA_HEAP_COUNT: AtomicUsize = AtomicUsize::new(0);
-    let n = CUDA_HEAP_COUNT.fetch_add(1, Ordering::Relaxed);
-    let heap_name = format!("cuda_heap{}", n);
-    dpdk::create_heap(&heap_name)?;
+fn get_mbuf_data(buf: &dpdk::Mbuf) -> &mut [u8] {
+    unsafe {
+        let ptr = buf.read_data_slice::<u8>(0, buf.data_len()).unwrap();
+        &mut *ptr.as_ptr()
+    }
+}
 
-    let mbuf_size = capsule::ffi::RTE_MBUF_DEFAULT_BUF_SIZE as usize;
+fn process_once(
+    port: &PortQueue,
+    temp_buf: &mut Vec<*mut ()>,
+    mbufs: &mut Vec<Mbuf>,
+    pktbufs: &mut Vec<*mut u8>,
+    lengths_in: &mut Vec<u64>,
+    lengths_out: &mut Vec<u64>,
+    offsets_out: &mut Vec<u64>,
+) {
+    temp_buf.clear();
+    mbufs.clear();
+    lengths_in.clear();
+    lengths_out.clear();
+    offsets_out.clear();
 
-    // assume we're using normal size pages for now.
-    let page_size = page_size::get();
-    let num_pages = calc_total_pages(capacity, mbuf_size, page_size);
-    let len = num_pages * page_size;
+    port.receive_into(temp_buf, mbufs, 256);
 
-    println!(
-        "allocating unified buffers of total len: {} (num_pages: {}, page_size: {})",
-        len, num_pages, page_size
-    );
+    let pkt_count = mbufs.len() as u64;
 
-    let mut buf = UnifiedBuffer::new(&0u8, len)?;
-    let buf_ptr = buf.as_mut_ptr() as *mut c_void;
+    for (i, pkt) in mbufs.into_iter().enumerate() {
+        let pkt_slice = get_mbuf_data(pkt);
+        pktbufs[i] = pkt_slice.as_mut_ptr();
+        lengths_in[i] = pkt_slice.len() as u64;
 
-    println!("allocated unified memory, adding to dpdk");
+        unsafe {
+            p4_process(
+                pktbufs.as_ptr(),
+                lengths_in.as_ptr(),
+                lengths_out.as_mut_ptr(),
+                offsets_out.as_mut_ptr(),
+                pkt_count,
+                i as u64,
+            );
+        }
 
-    dpdk::add_heap_memory(&heap_name, buf_ptr, len, num_pages, page_size)?;
+        if lengths_out[i] < lengths_in[i] {
+            // packet is smaller:
+            // in:  [HHHHDDDDD]
+            // out: [0HHHDDDDD]
 
-    let heap_socket = dpdk::SocketId::of_heap(&heap_name)?;
+            let _ = pkt.shrink(0, offsets_out[i] as usize);
+        } else if lengths_out[i] > lengths_in[i] {
+            // packet is migger
+            // in:  [HHHHDDDDD]
+            // out: [HHHHDDDDD]D
+            // (I hope this is fine)
+            let _ = pkt.extend(lengths_in[i] as usize, (lengths_out[i] - lengths_in[i]) as usize);
+        }
+    }
 
-    let pool = dpdk::Mempool::new(capacity, cache_size, heap_socket)?;
-    println!("allocated pool");
-    Ok(((buf, heap_socket), pool))
+    port.transmit_from(mbufs);
 }
 
 fn main_inner() -> Result<(), Box<dyn Error>> {
-    // simple_logger::init().unwrap();
-
-    rustacuda::init(CudaFlags::empty())?;
-
-    let device = Device::get_device(0)?;
-
-    let _context =
-        Context::create_and_push(ContextFlags::MAP_HOST | ContextFlags::SCHED_AUTO, device)?;
-
     let conf = capsule::config::RuntimeConfig {
         app_name: "test".to_owned(),
         secondary: false,
@@ -108,21 +108,10 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
 
     let sockets = cores.iter().map(|c| c.socket_id()).collect::<HashSet<_>>();
 
-    let (bufs_and_sockets, mut mempools): (Vec<_>, Vec<_>) = sockets
-        .into_iter()
-        // .map(|s| dpdk::Mempool::new(conf.mempool.capacity, conf.mempool.cache_size, s))
-        .map(|_s| allocate_gpu_mempool(conf.mempool.capacity, conf.mempool.cache_size))
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .unzip();
-
-    let (bufs, sockets): (Vec<_>, Vec<_>) = bufs_and_sockets.into_iter().unzip();
-
-    let extra_heap_mappings = cores
+    let mut mempools = sockets
         .iter()
-        .map(|c| c.socket_id())
-        .zip(sockets.iter().cloned())
-        .collect::<Vec<_>>();
+        .map(|s| dpdk::Mempool::new(conf.mempool.capacity, conf.mempool.cache_size, *s))
+        .collect::<Result<Vec<_>, _>>()?;
 
     let mut ports = conf
         .ports
@@ -130,7 +119,7 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
         .map(|p| {
             dpdk::PortBuilder::new(p.name.clone(), p.device.clone())?
                 .cores(&p.cores)?
-                .mempools(&mut mempools, &extra_heap_mappings)
+                .mempools(&mut mempools)
                 .rx_tx_queue_capacity(p.rxd, p.txd)?
                 .finish(p.promiscuous, p.multicast, p.kni)
         })
@@ -142,10 +131,7 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
         port.start()?;
     }
 
-
     let packet_buf_size = 512;
-
-    let coordinator = coordinator::Coordinator::new(packet_buf_size, 40)?;
 
     let queue = ports.first().unwrap().queues().values().next().unwrap();
 
@@ -155,8 +141,7 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
     let mut total_pkts = 0;
 
     loop {
-        let n_pkts = coordinator.process_packets(queue)?;
-
+        let n_pkts = 100;
         total_pkts += n_pkts;
 
         if n_pkts < packet_buf_size {
@@ -164,19 +149,17 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    coordinator.close();
-
     let end_t = Instant::now();
 
-    println!("done, took: {:?}, {} packets", end_t.duration_since(start_t), total_pkts);
+    println!(
+        "done, took: {:?}, {} packets",
+        end_t.duration_since(start_t),
+        total_pkts
+    );
 
     for port in &mut ports {
         port.stop();
     }
-
-    drop(bufs);
-    drop(ports);
-    drop(mempools);
 
     dpdk::eal_cleanup()?;
 

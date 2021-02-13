@@ -7,9 +7,10 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-capsule = { path = "capsule/core/", features = [] }
-rustacuda = "0.1.2"
-rustacuda_core = "0.1.2"
-page_size = "0.4.2"
+#capsule = { git = "https://github.com/nitros12/capsule.git", features = [], rev = "85bbe0657c412571002b66a0c89f6c7028027323" }
+capsule = { path = "../capsule/core", features = []}
+
+[build-dependencies]
+cc = "1.0.66"
 # tracing = { version = "0.1.17", features = ["log", "log-always"] }
 # simple_logger = "1.6.0"

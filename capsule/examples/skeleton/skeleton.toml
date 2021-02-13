@@ -1,9 +1,0 @@
-app_name = "skeleton"
-master_core = 0
-dpdk_args = "-v --log-level eal:8"
-duration = 5
-
-[[ports]]
-    name = "eth1"
-    device = "net_ring0"
-    cores = [0]
