@@ -34,21 +34,22 @@ fn process_once(
     lengths_in: &mut Vec<u64>,
     lengths_out: &mut Vec<u64>,
     offsets_out: &mut Vec<u64>,
-) {
+    buf_size: u16,
+) -> u16 {
     temp_buf.clear();
     mbufs.clear();
     lengths_in.clear();
     lengths_out.clear();
     offsets_out.clear();
 
-    port.receive_into(temp_buf, mbufs, 256);
+    port.receive_into(temp_buf, mbufs, buf_size);
 
     let pkt_count = mbufs.len() as u64;
 
     for (i, pkt) in mbufs.into_iter().enumerate() {
         let pkt_slice = get_mbuf_data(pkt);
-        pktbufs[i] = pkt_slice.as_mut_ptr();
-        lengths_in[i] = pkt_slice.len() as u64;
+        pktbufs.insert(i, pkt_slice.as_mut_ptr());
+        lengths_in.insert(i, pkt_slice.len() as u64);
 
         unsafe {
             p4_process(
@@ -59,6 +60,10 @@ fn process_once(
                 pkt_count,
                 i as u64,
             );
+
+            // lengths_out[i] is filled by p4_process
+            lengths_out.set_len(i + 1);
+            offsets_out.set_len(i + 1);
         }
 
         if lengths_out[i] < lengths_in[i] {
@@ -72,11 +77,16 @@ fn process_once(
             // in:  [HHHHDDDDD]
             // out: [HHHHDDDDD]D
             // (I hope this is fine)
-            let _ = pkt.extend(lengths_in[i] as usize, (lengths_out[i] - lengths_in[i]) as usize);
+            let _ = pkt.extend(
+                lengths_in[i] as usize,
+                (lengths_out[i] - lengths_in[i]) as usize,
+            );
         }
     }
 
     port.transmit_from(mbufs);
+
+    pkt_count as u16
 }
 
 fn main_inner() -> Result<(), Box<dyn Error>> {
@@ -140,8 +150,24 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
     let start_t = Instant::now();
     let mut total_pkts = 0;
 
+    let mut temp_buf = Vec::new();
+    let mut mbufs = Vec::new();
+    let mut pktbufs = Vec::new();
+    let mut lengths_in = Vec::new();
+    let mut lengths_out = Vec::new();
+    let mut offsets_out = Vec::new();
+
     loop {
-        let n_pkts = 100;
+        let n_pkts = process_once(
+            queue,
+            &mut temp_buf,
+            &mut mbufs,
+            &mut pktbufs,
+            &mut lengths_in,
+            &mut lengths_out,
+            &mut offsets_out,
+            packet_buf_size,
+        );
         total_pkts += n_pkts;
 
         if n_pkts < packet_buf_size {
