@@ -15,6 +15,7 @@ extern "C" {
         lengths_out: *mut u64,
         out_offsets: *mut u64,
         pkt_count: u64,
+        port: u64,
         i: u64,
     );
 }
@@ -44,7 +45,10 @@ fn process_once(
 
     port.receive_into(temp_buf, mbufs, buf_size);
 
-    let pkt_count = mbufs.len() as u64;
+    let pkt_count = mbufs.len();
+
+    lengths_out.reserve(pkt_count);
+    offsets_out.reserve(pkt_count);
 
     for (i, pkt) in mbufs.into_iter().enumerate() {
         let pkt_slice = get_mbuf_data(pkt);
@@ -57,7 +61,8 @@ fn process_once(
                 lengths_in.as_ptr(),
                 lengths_out.as_mut_ptr(),
                 offsets_out.as_mut_ptr(),
-                pkt_count,
+                pkt_count as u64,
+                0,
                 i as u64,
             );
 
@@ -83,6 +88,8 @@ fn process_once(
             );
         }
     }
+
+    println!("processed packets, transmitting");
 
     port.transmit_from(mbufs);
 

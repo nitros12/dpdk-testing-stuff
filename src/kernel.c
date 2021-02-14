@@ -425,15 +425,16 @@ static void dprs(struct ppacket packet, struct Headers_t hdr) {
   };
 }
 
-void p4_process(uint8_t ** pkts, uint64_t * lengths, uint64_t * out_lengths, uint64_t * out_offsets, uint64_t pkt_count, uint64_t i) {
+void p4_process(uint8_t ** pkts, uint64_t * lengths, uint64_t * out_lengths, uint64_t * out_offsets, uint64_t pkt_count, uint64_t port, uint64_t i) {
   if ((i) >= (pkt_count)) {
     {return;}
   };
+  struct standard_metadata std_meta = ((struct standard_metadata){.input_port = (port), .packet_length = ((lengths)[i])});
   struct packet pkt = ((struct packet){.pkt = ((pkts)[i]), .end = ((lengths)[i]), .base = (0), .offset = (0)});
   struct Headers_t hdr = ((struct Headers_t){(0)});
   struct ppacket ppkt = ((struct ppacket){.ppkt = (&(pkt))});
-  (prs)((ppkt), (&(hdr)), (NULL), (NULL));
-  (pipe)((&(hdr)), (NULL), (NULL));
+  (prs)((ppkt), (&(hdr)), (NULL), (&(std_meta)));
+  (pipe)((&(hdr)), (NULL), (&(std_meta)));
   (dprs)((ppkt), (hdr));
   ((out_lengths)[i]) = ((pkt).end);
   ((out_offsets)[i]) = ((pkt).base);
