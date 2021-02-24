@@ -70,12 +70,10 @@ struct Headers_t
 { struct IPv4_h ipv4;
   struct Ethernet_h ethernet;
 };
-enum ubpf_action {REDIRECT , PASS , DROP , ABORT};
+enum gpu_action {REDIRECT = (2) , PASS = (1) , DROP = (0)};
 struct standard_metadata
-{ uint32_t clone_port;
-  _Bool clone;
-  uint32_t output_port;
-  enum ubpf_action output_action;
+{ uint32_t output_port;
+  enum gpu_action output_action;
   uint32_t packet_length;
   uint32_t input_port;
 };
@@ -87,7 +85,7 @@ struct test_tbl_0
 struct metadata
 { char unused;
 };
-enum parser_states_prs {parser_state_prs_parse_ipv4 , parser_state_prs_start , parser_state_prs_accept , parser_state_prs_reject};
+enum parser_states_prs {parser_state_prs_parse_ipv4 = (3) , parser_state_prs_start = (2) , parser_state_prs_accept = (1) , parser_state_prs_reject = (0)};
 struct packet
 { uint8_t * pkt;
   uint16_t base;
@@ -257,7 +255,7 @@ static void NoAction_0(void) {
 
 static const struct match_tree_node * table_trie_driver_w8(const struct match_tree_node * node, uint32_t value) {
   size_t idx;
-  for ((idx) = (0); (idx) < (8); ++(idx)) {
+  for ((idx) = (1); (idx) <= (8); ++(idx)) {
     {(node) += (((node)->offsets)[((value) >> ((32) - ((idx) * (4)))) & (((1) << (4)) - (1))]);}
   };
   return node;

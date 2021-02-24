@@ -7,6 +7,21 @@ use std::{
     time::Instant,
 };
 
+#[repr(C)]
+enum Action {
+    Redirect = 2,
+    Pass = 1,
+    Drop = 0,
+}
+
+#[repr(C)]
+struct Metadata {
+    output_port: u32,
+    output_action: Action,
+    packet_length: u32,
+    input_port: u32,
+}
+
 #[link(name = "kernel", kind = "static")]
 extern "C" {
     fn p4_process(
@@ -62,7 +77,7 @@ fn process_once(
                 lengths_out.as_mut_ptr(),
                 offsets_out.as_mut_ptr(),
                 pkt_count as u64,
-                0,
+                2,
                 i as u64,
             );
 
