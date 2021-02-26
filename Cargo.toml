@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 #capsule = { git = "https://github.com/nitros12/capsule.git", features = [], rev = "85bbe0657c412571002b66a0c89f6c7028027323" }
 capsule = { path = "../capsule/core", features = []}
+howlong = "0.1.6"
 
 [build-dependencies]
 cc = "1.0.66"

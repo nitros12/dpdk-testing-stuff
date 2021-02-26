@@ -70,7 +70,7 @@ struct Headers_t
 { struct IPv4_h ipv4;
   struct Ethernet_h ethernet;
 };
-enum gpu_action {REDIRECT = (2) , PASS = (1) , DROP = (0)};
+enum gpu_action {EMIT = (1) , DROP = (0)};
 struct standard_metadata
 { uint32_t output_port;
   enum gpu_action output_action;
@@ -95,23 +95,27 @@ struct packet
 struct ppacket
 { struct packet * ppkt;
 };
-struct arg_table_test_tbl_0_mod_nw_tos
-{ uint32_t out_port;
+struct arg_table_test_tbl_0_allow
+{ char unused;
+};
+struct arg_table_test_tbl_0_deny
+{ char unused;
 };
 struct arg_table_test_tbl_0_NoAction_0
 { char unused;
 };
 union test_tbl_0_param_union
 { struct arg_table_test_tbl_0_NoAction_0 arg_table_test_tbl_0_NoAction_0;
-  struct arg_table_test_tbl_0_mod_nw_tos arg_table_test_tbl_0_mod_nw_tos;
+  struct arg_table_test_tbl_0_deny arg_table_test_tbl_0_deny;
+  struct arg_table_test_tbl_0_allow arg_table_test_tbl_0_allow;
 };
 struct match_tree_node
 { int16_t offsets[(16)];
   uint16_t action_idx;
   uint16_t param_idx;
 };
-const union test_tbl_0_param_union arg_table_test_tbl_0_entries[] = {{.arg_table_test_tbl_0_mod_nw_tos = {.out_port = (1)}}, {.arg_table_test_tbl_0_mod_nw_tos = {.out_port = (0)}}, {.arg_table_test_tbl_0_mod_nw_tos = {.out_port = (2)}}};
-const struct match_tree_node test_tbl_0_search_trie[(47)] = {{.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (1), .param_idx = (0)}, {.offsets = {(-1), (7), (43), (43), (43), (43), (43), (43), (43), (43), (43), (43), (43), (43), (43), (43)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (41), (41), (41), (41), (41), (41), (41), (41), (41), (41), (41), (41), (41), (41), (41)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (38), (38), (38), (38), (38), (38), (38), (38), (38), (38), (38), (38), (38), (38), (38)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (34), (34), (34), (34), (34), (34), (34), (34), (34), (34), (34), (34), (34), (34), (34)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (29), (29), (29), (29), (29), (29), (29), (29), (29), (29), (29), (29), (29), (29), (29)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (23), (23), (23), (23), (23), (23), (23), (23), (23), (23), (23), (23), (23), (23), (23)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (16), (16), (16), (16), (16), (16), (16), (16), (16), (16), (16), (16), (16), (16), (16)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (1), .param_idx = (1)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (1), .param_idx = (2)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (1), .param_idx = (2)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (1), .param_idx = (2)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (1), .param_idx = (2)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (1), .param_idx = (2)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (1), .param_idx = (2)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (1), .param_idx = (2)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (1), .param_idx = (2)}, {.offsets = {(-38), (-29), (-29), (-29), (-29), (-29), (-29), (-29), (-29), (-29), (-29), (-29), (-29), (-29), (-29), (-29)}, .action_idx = (0), .param_idx = (0)}};
+const union test_tbl_0_param_union arg_table_test_tbl_0_entries[] = {{.arg_table_test_tbl_0_allow = {.unused = (0)}}, {.arg_table_test_tbl_0_deny = {.unused = (0)}}};
+const struct match_tree_node test_tbl_0_search_trie[(46)] = {{.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (1), .param_idx = (0)}, {.offsets = {(42), (42), (42), (42), (42), (42), (42), (42), (42), (42), (42), (42), (42), (-1), (42), (42)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(40), (40), (40), (40), (40), (40), (-1), (40), (40), (40), (40), (40), (40), (40), (40), (40)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(37), (37), (37), (37), (37), (37), (37), (-1), (37), (37), (37), (37), (37), (37), (37), (37)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(33), (33), (33), (33), (33), (-1), (33), (33), (33), (33), (33), (33), (33), (33), (33), (33)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(28), (28), (28), (-1), (28), (28), (28), (28), (28), (28), (28), (28), (28), (28), (28), (28)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(22), (22), (22), (22), (22), (22), (22), (22), (22), (22), (-1), (22), (22), (22), (22), (22)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(15), (15), (15), (15), (15), (-1), (15), (15), (15), (15), (15), (15), (15), (15), (15), (15)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (2), .param_idx = (1)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (2), .param_idx = (1)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (2), .param_idx = (1)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (2), .param_idx = (1)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (2), .param_idx = (1)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (2), .param_idx = (1)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (2), .param_idx = (1)}, {.offsets = {(-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1), (-1)}, .action_idx = (0), .param_idx = (0)}, {.offsets = {(0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0), (0)}, .action_idx = (2), .param_idx = (1)}, {.offsets = {(-29), (-29), (-29), (-29), (-29), (-29), (-29), (-29), (-29), (-29), (-29), (-29), (-29), (-37), (-29), (-29)}, .action_idx = (0), .param_idx = (0)}};
 
 static _Bool extract_packet_Ethernet_h(struct ppacket ppkt, struct Ethernet_h * hdr) {
   if ((((ppkt).ppkt)->end) < ((((ppkt).ppkt)->offset) + (14))) {
@@ -242,11 +246,12 @@ static _Bool prs(struct ppacket packet, struct Headers_t * hdr, struct metadata 
   };
 }
 
-static void mod_nw_tos(uint32_t out_port, uint8_t * i0_0, struct standard_metadata * std_meta, struct Headers_t * hdr) {
-  (((*(hdr)).ipv4).diffserv) = ((*(i0_0)) + (1));
-  ((*(std_meta)).output_action) = (REDIRECT);
-  ((*(std_meta)).output_port) = (out_port);
-  (*(i0_0)) = ((*(i0_0)) + (1));
+static void allow(struct standard_metadata * std_meta) {
+  ((*(std_meta)).output_action) = (EMIT);
+}
+
+static void deny(struct standard_metadata * std_meta) {
+  ((*(std_meta)).output_action) = (DROP);
 }
 
 static void NoAction_0(void) {
@@ -262,35 +267,33 @@ static const struct match_tree_node * table_trie_driver_w8(const struct match_tr
 }
 
 static void pipe(struct Headers_t * hdr, struct metadata * meta, struct standard_metadata * std_meta) {
-  uint8_t i0_0;
-  (i0_0) = (0);
-  uint32_t tmp_var_54 = ((*(std_meta)).input_port);
-  const struct match_tree_node * tmp_var_55 = (&((test_tbl_0_search_trie)[46]));
-  (tmp_var_55) = ((table_trie_driver_w8)((tmp_var_55), (tmp_var_54)));
-  _Bool tmp_var_69;
-  switch ((tmp_var_55)->action_idx) {
-    {default: {(tmp_var_69) = (false);};
-     case (1): {(tmp_var_69) = (true);
-                uint32_t tmp_var_56 = ((((arg_table_test_tbl_0_entries)[(tmp_var_55)->param_idx]).arg_table_test_tbl_0_mod_nw_tos).out_port);
-                uint32_t tmp_var_62 = (tmp_var_56);
-                uint8_t * tmp_var_63 = (&(i0_0));
-                uint8_t tmp_var_64 = (*(tmp_var_63));
-                struct standard_metadata * tmp_var_65 = (&(*(std_meta)));
-                struct standard_metadata tmp_var_66 = (*(tmp_var_65));
-                struct Headers_t * tmp_var_67 = (&(*(hdr)));
-                struct Headers_t tmp_var_68 = (*(tmp_var_67));
-                (mod_nw_tos)((tmp_var_62), (&(tmp_var_64)), (&(tmp_var_66)), (&(tmp_var_68)));
-                (*(tmp_var_63)) = (tmp_var_64);
-                (*(tmp_var_65)) = (tmp_var_66);
-                (*(tmp_var_67)) = (tmp_var_68);
+  uint32_t tmp_var_53 = (((*(hdr)).ipv4).dstAddr);
+  const struct match_tree_node * tmp_var_54 = (&((test_tbl_0_search_trie)[45]));
+  (tmp_var_54) = ((table_trie_driver_w8)((tmp_var_54), (tmp_var_53)));
+  _Bool tmp_var_61;
+  switch ((tmp_var_54)->action_idx) {
+    {default: {(tmp_var_61) = (false);
+               break;};
+     case (1): {(tmp_var_61) = (true);
+                struct standard_metadata * tmp_var_56 = (&(*(std_meta)));
+                struct standard_metadata tmp_var_57 = (*(tmp_var_56));
+                (allow)((&(tmp_var_57)));
+                (*(tmp_var_56)) = (tmp_var_57);
                 0;
                 break;};
-     case (0): {(tmp_var_69) = (false);
+     case (0): {(tmp_var_61) = (false);
                 (NoAction_0)();
+                0;
+                break;};
+     case (2): {(tmp_var_61) = (true);
+                struct standard_metadata * tmp_var_59 = (&(*(std_meta)));
+                struct standard_metadata tmp_var_60 = (*(tmp_var_59));
+                (deny)((&(tmp_var_60)));
+                (*(tmp_var_59)) = (tmp_var_60);
                 0;
                 break;};}
   };
-  (struct test_tbl_0){.action_run = ((tmp_var_55)->action_idx), .miss = (!(tmp_var_69)), .hit = (tmp_var_69)};
+  (struct test_tbl_0){.action_run = ((tmp_var_54)->action_idx), .miss = (!(tmp_var_61)), .hit = (tmp_var_61)};
 }
 
 static void write_partial(uint8_t * addr, uint8_t width, uint8_t shift, uint8_t value) {
@@ -298,95 +301,95 @@ static void write_partial(uint8_t * addr, uint8_t width, uint8_t shift, uint8_t 
 }
 
 static void emit_packet_Ethernet_h(struct ppacket ppkt, struct Ethernet_h * value) {
-  uint64_t tmp_var_72 = (0);
-  uint64_t tmp_var_73 = ((p4_htonll)((((*(value)).dstAddr) << (16))));
-  uint8_t * tmp_var_74 = ((uint8_t *)(&(tmp_var_73)));
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_72) / (8))) + (0))) = ((tmp_var_74)[0]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_72) / (8))) + (1))) = ((tmp_var_74)[1]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_72) / (8))) + (2))) = ((tmp_var_74)[2]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_72) / (8))) + (3))) = ((tmp_var_74)[3]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_72) / (8))) + (4))) = ((tmp_var_74)[4]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_72) / (8))) + (5))) = ((tmp_var_74)[5]);
-  (tmp_var_72) += (48);
-  uint64_t tmp_var_75 = ((p4_htonll)((((*(value)).srcAddr) << (16))));
-  uint8_t * tmp_var_76 = ((uint8_t *)(&(tmp_var_75)));
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_72) / (8))) + (0))) = ((tmp_var_76)[0]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_72) / (8))) + (1))) = ((tmp_var_76)[1]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_72) / (8))) + (2))) = ((tmp_var_76)[2]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_72) / (8))) + (3))) = ((tmp_var_76)[3]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_72) / (8))) + (4))) = ((tmp_var_76)[4]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_72) / (8))) + (5))) = ((tmp_var_76)[5]);
-  (tmp_var_72) += (48);
-  uint16_t tmp_var_77 = ((p4_htons)((((*(value)).etherType) << (0))));
-  uint8_t * tmp_var_78 = ((uint8_t *)(&(tmp_var_77)));
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_72) / (8))) + (0))) = ((tmp_var_78)[0]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_72) / (8))) + (1))) = ((tmp_var_78)[1]);
-  (tmp_var_72) += (16);
-  (((ppkt).ppkt)->offset) = ((tmp_var_72) / (8));
+  uint64_t tmp_var_64 = (0);
+  uint64_t tmp_var_65 = ((p4_htonll)((((*(value)).dstAddr) << (16))));
+  uint8_t * tmp_var_66 = ((uint8_t *)(&(tmp_var_65)));
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_64) / (8))) + (0))) = ((tmp_var_66)[0]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_64) / (8))) + (1))) = ((tmp_var_66)[1]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_64) / (8))) + (2))) = ((tmp_var_66)[2]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_64) / (8))) + (3))) = ((tmp_var_66)[3]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_64) / (8))) + (4))) = ((tmp_var_66)[4]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_64) / (8))) + (5))) = ((tmp_var_66)[5]);
+  (tmp_var_64) += (48);
+  uint64_t tmp_var_67 = ((p4_htonll)((((*(value)).srcAddr) << (16))));
+  uint8_t * tmp_var_68 = ((uint8_t *)(&(tmp_var_67)));
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_64) / (8))) + (0))) = ((tmp_var_68)[0]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_64) / (8))) + (1))) = ((tmp_var_68)[1]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_64) / (8))) + (2))) = ((tmp_var_68)[2]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_64) / (8))) + (3))) = ((tmp_var_68)[3]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_64) / (8))) + (4))) = ((tmp_var_68)[4]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_64) / (8))) + (5))) = ((tmp_var_68)[5]);
+  (tmp_var_64) += (48);
+  uint16_t tmp_var_69 = ((p4_htons)((((*(value)).etherType) << (0))));
+  uint8_t * tmp_var_70 = ((uint8_t *)(&(tmp_var_69)));
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_64) / (8))) + (0))) = ((tmp_var_70)[0]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_64) / (8))) + (1))) = ((tmp_var_70)[1]);
+  (tmp_var_64) += (16);
+  (((ppkt).ppkt)->offset) = ((tmp_var_64) / (8));
 }
 
 static void emit_packet_IPv4_h(struct ppacket ppkt, struct IPv4_h * value) {
-  uint64_t tmp_var_82 = (0);
-  uint8_t tmp_var_83 = ((*(value)).version);
+  uint64_t tmp_var_74 = (0);
+  uint8_t tmp_var_75 = ((*(value)).version);
+  uint8_t * tmp_var_76 = ((uint8_t *)(&(tmp_var_75)));
+  (write_partial)((&(*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (0)))), (4), (4), (((tmp_var_76)[0]) >> (0)));
+  (tmp_var_74) += (4);
+  uint8_t tmp_var_77 = ((*(value)).ihl);
+  uint8_t * tmp_var_78 = ((uint8_t *)(&(tmp_var_77)));
+  (write_partial)((&(*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (0)))), (4), (0), (((tmp_var_78)[0]) >> (0)));
+  (tmp_var_74) += (4);
+  uint8_t tmp_var_79 = ((*(value)).diffserv);
+  uint8_t * tmp_var_80 = ((uint8_t *)(&(tmp_var_79)));
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (0))) = ((tmp_var_80)[0]);
+  (tmp_var_74) += (8);
+  uint16_t tmp_var_81 = ((p4_htons)((((*(value)).totalLen) << (0))));
+  uint8_t * tmp_var_82 = ((uint8_t *)(&(tmp_var_81)));
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (0))) = ((tmp_var_82)[0]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (1))) = ((tmp_var_82)[1]);
+  (tmp_var_74) += (16);
+  uint16_t tmp_var_83 = ((p4_htons)((((*(value)).identification) << (0))));
   uint8_t * tmp_var_84 = ((uint8_t *)(&(tmp_var_83)));
-  (write_partial)((&(*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (0)))), (4), (4), (((tmp_var_84)[0]) >> (0)));
-  (tmp_var_82) += (4);
-  uint8_t tmp_var_85 = ((*(value)).ihl);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (0))) = ((tmp_var_84)[0]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (1))) = ((tmp_var_84)[1]);
+  (tmp_var_74) += (16);
+  uint8_t tmp_var_85 = ((*(value)).flags);
   uint8_t * tmp_var_86 = ((uint8_t *)(&(tmp_var_85)));
-  (write_partial)((&(*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (0)))), (4), (0), (((tmp_var_86)[0]) >> (0)));
-  (tmp_var_82) += (4);
-  uint8_t tmp_var_87 = ((*(value)).diffserv);
+  (write_partial)((&(*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (0)))), (3), (5), (((tmp_var_86)[0]) >> (0)));
+  (tmp_var_74) += (3);
+  uint16_t tmp_var_87 = ((p4_htons)((((*(value)).fragOffset) << (3))));
   uint8_t * tmp_var_88 = ((uint8_t *)(&(tmp_var_87)));
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (0))) = ((tmp_var_88)[0]);
-  (tmp_var_82) += (8);
-  uint16_t tmp_var_89 = ((p4_htons)((((*(value)).totalLen) << (0))));
+  (write_partial)((&(*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (0)))), (5), (0), (((tmp_var_88)[0]) >> (3)));
+  (write_partial)(((&(*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (0)))) + (1)), (3), (5), ((tmp_var_88)[0]));
+  (write_partial)((&(*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (1)))), (5), (3), (((tmp_var_88)[1]) >> (3)));
+  (tmp_var_74) += (13);
+  uint8_t tmp_var_89 = ((*(value)).ttl);
   uint8_t * tmp_var_90 = ((uint8_t *)(&(tmp_var_89)));
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (0))) = ((tmp_var_90)[0]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (1))) = ((tmp_var_90)[1]);
-  (tmp_var_82) += (16);
-  uint16_t tmp_var_91 = ((p4_htons)((((*(value)).identification) << (0))));
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (0))) = ((tmp_var_90)[0]);
+  (tmp_var_74) += (8);
+  uint8_t tmp_var_91 = ((*(value)).protocol);
   uint8_t * tmp_var_92 = ((uint8_t *)(&(tmp_var_91)));
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (0))) = ((tmp_var_92)[0]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (1))) = ((tmp_var_92)[1]);
-  (tmp_var_82) += (16);
-  uint8_t tmp_var_93 = ((*(value)).flags);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (0))) = ((tmp_var_92)[0]);
+  (tmp_var_74) += (8);
+  uint16_t tmp_var_93 = ((p4_htons)((((*(value)).hdrChecksum) << (0))));
   uint8_t * tmp_var_94 = ((uint8_t *)(&(tmp_var_93)));
-  (write_partial)((&(*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (0)))), (3), (5), (((tmp_var_94)[0]) >> (0)));
-  (tmp_var_82) += (3);
-  uint16_t tmp_var_95 = ((p4_htons)((((*(value)).fragOffset) << (3))));
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (0))) = ((tmp_var_94)[0]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (1))) = ((tmp_var_94)[1]);
+  (tmp_var_74) += (16);
+  uint32_t tmp_var_95 = ((p4_htonl)((((*(value)).srcAddr) << (0))));
   uint8_t * tmp_var_96 = ((uint8_t *)(&(tmp_var_95)));
-  (write_partial)((&(*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (0)))), (5), (0), (((tmp_var_96)[0]) >> (3)));
-  (write_partial)(((&(*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (0)))) + (1)), (3), (5), ((tmp_var_96)[0]));
-  (write_partial)((&(*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (1)))), (5), (3), (((tmp_var_96)[1]) >> (3)));
-  (tmp_var_82) += (13);
-  uint8_t tmp_var_97 = ((*(value)).ttl);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (0))) = ((tmp_var_96)[0]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (1))) = ((tmp_var_96)[1]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (2))) = ((tmp_var_96)[2]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (3))) = ((tmp_var_96)[3]);
+  (tmp_var_74) += (32);
+  uint32_t tmp_var_97 = ((p4_htonl)((((*(value)).dstAddr) << (0))));
   uint8_t * tmp_var_98 = ((uint8_t *)(&(tmp_var_97)));
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (0))) = ((tmp_var_98)[0]);
-  (tmp_var_82) += (8);
-  uint8_t tmp_var_99 = ((*(value)).protocol);
-  uint8_t * tmp_var_100 = ((uint8_t *)(&(tmp_var_99)));
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (0))) = ((tmp_var_100)[0]);
-  (tmp_var_82) += (8);
-  uint16_t tmp_var_101 = ((p4_htons)((((*(value)).hdrChecksum) << (0))));
-  uint8_t * tmp_var_102 = ((uint8_t *)(&(tmp_var_101)));
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (0))) = ((tmp_var_102)[0]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (1))) = ((tmp_var_102)[1]);
-  (tmp_var_82) += (16);
-  uint32_t tmp_var_103 = ((p4_htonl)((((*(value)).srcAddr) << (0))));
-  uint8_t * tmp_var_104 = ((uint8_t *)(&(tmp_var_103)));
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (0))) = ((tmp_var_104)[0]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (1))) = ((tmp_var_104)[1]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (2))) = ((tmp_var_104)[2]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (3))) = ((tmp_var_104)[3]);
-  (tmp_var_82) += (32);
-  uint32_t tmp_var_105 = ((p4_htonl)((((*(value)).dstAddr) << (0))));
-  uint8_t * tmp_var_106 = ((uint8_t *)(&(tmp_var_105)));
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (0))) = ((tmp_var_106)[0]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (1))) = ((tmp_var_106)[1]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (2))) = ((tmp_var_106)[2]);
-  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_82) / (8))) + (3))) = ((tmp_var_106)[3]);
-  (tmp_var_82) += (32);
-  (((ppkt).ppkt)->offset) = ((tmp_var_82) / (8));
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (0))) = ((tmp_var_98)[0]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (1))) = ((tmp_var_98)[1]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (2))) = ((tmp_var_98)[2]);
+  (*(((((ppkt).ppkt)->pkt) + ((tmp_var_74) / (8))) + (3))) = ((tmp_var_98)[3]);
+  (tmp_var_74) += (32);
+  (((ppkt).ppkt)->offset) = ((tmp_var_74) / (8));
 }
 
 static void adjust_packet(struct packet * pkt, int current_size, int final_size) {
@@ -406,33 +409,33 @@ static void adjust_packet(struct packet * pkt, int current_size, int final_size)
 static void dprs(struct ppacket packet, struct Headers_t hdr) {
   (adjust_packet)(((packet).ppkt), (272), (272));
   if (((hdr).ethernet).p4_valid) {
-    {struct ppacket tmp_var_79 = (packet);
-     struct Ethernet_h * tmp_var_80 = (&((hdr).ethernet));
-     struct Ethernet_h tmp_var_81 = (*(tmp_var_80));
-     (emit_packet_Ethernet_h)((tmp_var_79), (&(tmp_var_81)));
-     (*(tmp_var_80)) = (tmp_var_81);
+    {struct ppacket tmp_var_71 = (packet);
+     struct Ethernet_h * tmp_var_72 = (&((hdr).ethernet));
+     struct Ethernet_h tmp_var_73 = (*(tmp_var_72));
+     (emit_packet_Ethernet_h)((tmp_var_71), (&(tmp_var_73)));
+     (*(tmp_var_72)) = (tmp_var_73);
      0;}
   };
   if (((hdr).ipv4).p4_valid) {
-    {struct ppacket tmp_var_107 = (packet);
-     struct IPv4_h * tmp_var_108 = (&((hdr).ipv4));
-     struct IPv4_h tmp_var_109 = (*(tmp_var_108));
-     (emit_packet_IPv4_h)((tmp_var_107), (&(tmp_var_109)));
-     (*(tmp_var_108)) = (tmp_var_109);
+    {struct ppacket tmp_var_99 = (packet);
+     struct IPv4_h * tmp_var_100 = (&((hdr).ipv4));
+     struct IPv4_h tmp_var_101 = (*(tmp_var_100));
+     (emit_packet_IPv4_h)((tmp_var_99), (&(tmp_var_101)));
+     (*(tmp_var_100)) = (tmp_var_101);
      0;}
   };
 }
 
-void p4_process(uint8_t ** pkts, uint64_t * lengths, uint64_t * out_lengths, uint64_t * out_offsets, uint64_t pkt_count, uint64_t port, uint64_t i) {
+void p4_process(uint8_t ** pkts, struct standard_metadata * std_meta, uint64_t * lengths, uint64_t * out_lengths, uint64_t * out_offsets, uint64_t pkt_count, uint64_t port, uint64_t i) {
   if ((i) >= (pkt_count)) {
     {return;}
   };
-  struct standard_metadata std_meta = ((struct standard_metadata){.input_port = (port), .packet_length = ((lengths)[i])});
+  struct metadata meta = ((struct metadata){(0)});
   struct packet pkt = ((struct packet){.pkt = ((pkts)[i]), .end = ((lengths)[i]), .base = (0), .offset = (0)});
   struct Headers_t hdr = ((struct Headers_t){(0)});
   struct ppacket ppkt = ((struct ppacket){.ppkt = (&(pkt))});
-  (prs)((ppkt), (&(hdr)), (NULL), (&(std_meta)));
-  (pipe)((&(hdr)), (NULL), (&(std_meta)));
+  (prs)((ppkt), (&(hdr)), (&(meta)), (&((std_meta)[i])));
+  (pipe)((&(hdr)), (&(meta)), (&((std_meta)[i])));
   (dprs)((ppkt), (hdr));
   ((out_lengths)[i]) = ((pkt).end);
   ((out_offsets)[i]) = ((pkt).base);

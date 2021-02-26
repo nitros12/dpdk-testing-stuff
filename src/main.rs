@@ -1,16 +1,16 @@
 use capsule::{dpdk, Mbuf, PortQueue};
+use howlong::HighResolutionTimer;
 use std::{
     collections::HashSet,
     error::Error,
     ffi::c_void,
     sync::atomic::{AtomicUsize, Ordering},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 #[repr(C)]
 enum Action {
-    Redirect = 2,
-    Pass = 1,
+    Emit = 1,
     Drop = 0,
 }
 
@@ -26,6 +26,7 @@ struct Metadata {
 extern "C" {
     fn p4_process(
         pkts: *const *mut u8,
+        meta: *mut Metadata,
         lengths: *const u64,
         lengths_out: *mut u64,
         out_offsets: *mut u64,
@@ -42,73 +43,179 @@ fn get_mbuf_data(buf: &dpdk::Mbuf) -> &mut [u8] {
     }
 }
 
+struct PortInfo<'a> {
+    port: &'a PortQueue,
+    transmit_queue: Vec<Mbuf>,
+    transmitted: usize,
+}
+
+impl<'a> PortInfo<'a> {
+    fn new(port: &'a PortQueue) -> Self {
+        Self {
+            port,
+            transmit_queue: Vec::new(),
+            transmitted: 0,
+        }
+    }
+
+    fn add_to_queue(&mut self, mbuf: Mbuf) {
+        self.transmit_queue.push(mbuf);
+    }
+
+    fn flush(&mut self) {
+        if !self.transmit_queue.is_empty() {
+            self.transmitted += self.transmit_queue.len();
+
+            self.port.transmit_from(&mut self.transmit_queue);
+        }
+    }
+}
+
+struct ProcessData<'a> {
+    ports: Vec<PortInfo<'a>>,
+    dropped: usize,
+    drop_queue: Vec<Mbuf>,
+    temp_buf: Vec<*mut ()>,
+    mbufs: Vec<Mbuf>,
+    pktbufs: Vec<*mut u8>,
+    metas: Vec<Metadata>,
+    lengths_in: Vec<u64>,
+    lengths_out: Vec<u64>,
+    offsets_out: Vec<u64>,
+    buf_size: u16,
+}
+
+impl<'a> ProcessData<'a> {
+    fn new(ports: &[&'a PortQueue], buf_size: u16) -> Self {
+        let ports = ports.into_iter().cloned().map(PortInfo::new).collect();
+
+        Self {
+            ports,
+            drop_queue: Vec::new(),
+            dropped: 0,
+            temp_buf: Vec::with_capacity(buf_size as usize),
+            mbufs: Vec::with_capacity(buf_size as usize),
+            pktbufs: Vec::with_capacity(buf_size as usize),
+            metas: Vec::with_capacity(buf_size as usize),
+            lengths_in: Vec::with_capacity(buf_size as usize),
+            lengths_out: Vec::with_capacity(buf_size as usize),
+            offsets_out: Vec::with_capacity(buf_size as usize),
+            buf_size,
+        }
+    }
+
+    fn clear(&mut self) {
+        self.temp_buf.clear();
+        self.mbufs.clear();
+        self.metas.clear();
+        self.lengths_in.clear();
+        self.lengths_out.clear();
+        self.offsets_out.clear();
+    }
+
+    fn flush(&mut self) {
+        for port in &mut self.ports {
+            port.flush();
+        }
+
+        if !self.drop_queue.is_empty() {
+            self.dropped += self.drop_queue.len();
+            Mbuf::free_bulk(std::mem::replace(&mut self.drop_queue, Vec::new()));
+        }
+    }
+
+    fn print_stats(&self) {
+        println!("dropped: {}", self.dropped);
+
+        for (idx, port) in self.ports.iter().enumerate() {
+            println!("port {}: {}", idx, port.transmitted);
+        }
+    }
+}
+
 fn process_once(
     port: &PortQueue,
-    temp_buf: &mut Vec<*mut ()>,
-    mbufs: &mut Vec<Mbuf>,
-    pktbufs: &mut Vec<*mut u8>,
-    lengths_in: &mut Vec<u64>,
-    lengths_out: &mut Vec<u64>,
-    offsets_out: &mut Vec<u64>,
-    buf_size: u16,
-) -> u16 {
-    temp_buf.clear();
-    mbufs.clear();
-    lengths_in.clear();
-    lengths_out.clear();
-    offsets_out.clear();
+    port_idx: u32,
+    process_data: &mut ProcessData<'_>,
+) -> (usize, Duration) {
+    process_data.clear();
 
-    port.receive_into(temp_buf, mbufs, buf_size);
+    port.receive_into(
+        &mut process_data.temp_buf,
+        &mut process_data.mbufs,
+        process_data.buf_size,
+    );
 
-    let pkt_count = mbufs.len();
+    let start = HighResolutionTimer::new();
 
-    lengths_out.reserve(pkt_count);
-    offsets_out.reserve(pkt_count);
+    let pkt_count = process_data.mbufs.len();
 
-    for (i, pkt) in mbufs.into_iter().enumerate() {
-        let pkt_slice = get_mbuf_data(pkt);
-        pktbufs.insert(i, pkt_slice.as_mut_ptr());
-        lengths_in.insert(i, pkt_slice.len() as u64);
+    process_data.lengths_out.reserve(pkt_count);
+    process_data.offsets_out.reserve(pkt_count);
+
+    for (i, mut pkt) in process_data.mbufs.drain(..).enumerate() {
+        let pkt_slice = get_mbuf_data(&pkt);
+        process_data.pktbufs.insert(i, pkt_slice.as_mut_ptr());
+        process_data.lengths_in.insert(i, pkt_slice.len() as u64);
+        process_data.metas.insert(
+            i,
+            Metadata {
+                output_port: port_idx,
+                output_action: Action::Drop,
+                packet_length: pkt_slice.len() as u32,
+                input_port: port_idx,
+            },
+        );
 
         unsafe {
             p4_process(
-                pktbufs.as_ptr(),
-                lengths_in.as_ptr(),
-                lengths_out.as_mut_ptr(),
-                offsets_out.as_mut_ptr(),
+                process_data.pktbufs.as_ptr(),
+                process_data.metas.as_mut_ptr(),
+                process_data.lengths_in.as_ptr(),
+                process_data.lengths_out.as_mut_ptr(),
+                process_data.offsets_out.as_mut_ptr(),
                 pkt_count as u64,
-                2,
+                port_idx as u64,
                 i as u64,
             );
 
             // lengths_out[i] is filled by p4_process
-            lengths_out.set_len(i + 1);
-            offsets_out.set_len(i + 1);
+            process_data.lengths_out.set_len(i + 1);
+            process_data.offsets_out.set_len(i + 1);
         }
 
-        if lengths_out[i] < lengths_in[i] {
+        if process_data.lengths_out[i] < process_data.lengths_in[i] {
             // packet is smaller:
             // in:  [HHHHDDDDD]
             // out: [0HHHDDDDD]
 
-            let _ = pkt.shrink(0, offsets_out[i] as usize);
-        } else if lengths_out[i] > lengths_in[i] {
+            let _ = pkt.shrink(0, process_data.offsets_out[i] as usize);
+        } else if process_data.lengths_out[i] > process_data.lengths_in[i] {
             // packet is migger
             // in:  [HHHHDDDDD]
             // out: [HHHHDDDDD]D
             // (I hope this is fine)
             let _ = pkt.extend(
-                lengths_in[i] as usize,
-                (lengths_out[i] - lengths_in[i]) as usize,
+                process_data.lengths_in[i] as usize,
+                (process_data.lengths_out[i] - process_data.lengths_in[i]) as usize,
             );
+        }
+
+        match process_data.metas[i].output_action {
+            Action::Emit => {
+                process_data.ports[process_data.metas[i].output_port as usize].add_to_queue(pkt);
+            }
+            Action::Drop => {
+                process_data.drop_queue.push(pkt);
+            }
         }
     }
 
-    println!("processed packets, transmitting");
+    process_data.flush();
 
-    port.transmit_from(mbufs);
+    let elapsed = start.elapsed();
 
-    pkt_count as u16
+    (pkt_count, elapsed)
 }
 
 fn main_inner() -> Result<(), Box<dyn Error>> {
@@ -122,7 +229,7 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
         ports: vec![capsule::config::PortConfig {
             name: "testPort0".to_owned(),
             device: "net_pcap0".to_owned(),
-            args: Some("rx_pcap=dump.pcap,tx_iface=lo".to_owned()),
+            args: Some("rx_pcap=dump2.pcap".to_owned()),
             cores: vec![dpdk::CoreId::new(0)],
             rxd: 128,
             txd: 128,
@@ -165,45 +272,39 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
 
     let packet_buf_size = 512;
 
+    let port_queues: Vec<_> = ports
+        .iter()
+        .map(|p| p.queues().values().next().unwrap())
+        .collect();
     let queue = ports.first().unwrap().queues().values().next().unwrap();
 
     println!("receiving packets");
 
     let start_t = Instant::now();
+    let mut processing_duration = Duration::default();
     let mut total_pkts = 0;
 
-    let mut temp_buf = Vec::new();
-    let mut mbufs = Vec::new();
-    let mut pktbufs = Vec::new();
-    let mut lengths_in = Vec::new();
-    let mut lengths_out = Vec::new();
-    let mut offsets_out = Vec::new();
+    let mut process_data = ProcessData::new(&port_queues, packet_buf_size as u16);
 
     loop {
-        let n_pkts = process_once(
-            queue,
-            &mut temp_buf,
-            &mut mbufs,
-            &mut pktbufs,
-            &mut lengths_in,
-            &mut lengths_out,
-            &mut offsets_out,
-            packet_buf_size,
-        );
+        let (n_pkts, duration) = process_once(queue, 0, &mut process_data);
+
         total_pkts += n_pkts;
+        processing_duration += duration;
 
         if n_pkts < packet_buf_size {
             break;
         }
     }
 
-    let end_t = Instant::now();
+    let total_duration = start_t.elapsed();
 
     println!(
-        "done, took: {:?}, {} packets",
-        end_t.duration_since(start_t),
-        total_pkts
+        "done, took: {:?} total, {:?} spent in-processing, {} packets",
+        total_duration, processing_duration, total_pkts
     );
+
+    process_data.print_stats();
 
     for port in &mut ports {
         port.stop();
