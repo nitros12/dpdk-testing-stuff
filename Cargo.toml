@@ -7,8 +7,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-#capsule = { git = "https://github.com/nitros12/capsule.git", features = [], rev = "85bbe0657c412571002b66a0c89f6c7028027323" }
-capsule = { path = "../capsule/core", features = []}
+capsule = { git = "https://github.com/nitros12/capsule.git", features = [], rev = "d78f7110e474a87fd227e0ee9021b2b7f2cbfc6a" }
+#capsule = { path = "../capsule/core", features = []}
 howlong = "0.1.6"
 
 [build-dependencies]

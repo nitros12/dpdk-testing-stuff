@@ -121,6 +121,7 @@ dependencies = [
 [[package]]
 name = "capsule"
 version = "0.1.4"
+source = "git+https://github.com/nitros12/capsule.git?rev=d78f7110e474a87fd227e0ee9021b2b7f2cbfc6a#d78f7110e474a87fd227e0ee9021b2b7f2cbfc6a"
 dependencies = [
  "capsule-ffi",
  "capsule-macros",
@@ -142,6 +143,7 @@ dependencies = [
 [[package]]
 name = "capsule-ffi"
 version = "0.1.4"
+source = "git+https://github.com/nitros12/capsule.git?rev=d78f7110e474a87fd227e0ee9021b2b7f2cbfc6a#d78f7110e474a87fd227e0ee9021b2b7f2cbfc6a"
 dependencies = [
  "bindgen",
  "cc",
@@ -151,6 +153,7 @@ dependencies = [
 [[package]]
 name = "capsule-macros"
 version = "0.1.4"
+source = "git+https://github.com/nitros12/capsule.git?rev=d78f7110e474a87fd227e0ee9021b2b7f2cbfc6a#d78f7110e474a87fd227e0ee9021b2b7f2cbfc6a"
 dependencies = [
  "darling",
  "quote",
