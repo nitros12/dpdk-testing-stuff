@@ -299,9 +299,14 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
 
     let total_duration = start_t.elapsed();
 
+    let total_secs = (processing_duration.as_nanos() as f64) / 1_000_000_000f64;
+
     println!(
-        "done, took: {:?} total, {:?} spent in-processing, {} packets",
-        total_duration, processing_duration, total_pkts
+        "done, took: {:?} total, {:?} spent in-processing, {} packets, {} pkt/s",
+        total_duration,
+        processing_duration,
+        total_pkts,
+        total_pkts as f64 / total_secs
     );
 
     process_data.print_stats();
