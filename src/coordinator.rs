@@ -1,63 +1,51 @@
-use capsule::{PortQueue, Mbuf, dpdk};
-use rustacuda::{memory::UnifiedBuffer, prelude::{StreamFlags, Stream}, module::Module, launch};
-use std::{ffi::CString, error::Error, sync::{mpsc::{Sender, Receiver, channel}, Arc}};
+use capsule::{dpdk, Mbuf, PortQueue};
+use rustacuda::{
+    launch,
+    memory::{UnifiedBuffer, UnifiedPointer},
+    module::Module,
+    prelude::{Stream, StreamFlags},
+};
+use std::{
+    error::Error,
+    ffi::CString,
+    sync::{
+        mpsc::{channel, sync_channel, Receiver, Sender, SyncSender},
+        Arc, Mutex,
+    },
+};
 
-struct Worker {
+use crate::meta::{Action, Metadata};
+use crate::portinfo::PortInfo;
+
+struct WorkerBufs {
+    pkt_ptrs: UnifiedBuffer<UnifiedPointer<u8>>,
+    metas: UnifiedBuffer<Metadata>,
+    lengths_in: UnifiedBuffer<usize>,
+    lengths_out: UnifiedBuffer<usize>,
+    out_offsets: UnifiedBuffer<usize>,
+}
+
+struct WorkerPorts<'a> {
+    ports: Vec<PortInfo<'a>>,
+    drop_queue: Vec<Mbuf>,
+    dropped_packets: usize,
+}
+
+struct Worker<'a> {
     max_capacity: u16,
     stream: Arc<Stream>,
-    result_buf: UnifiedBuffer<u32>,
-    pkt_ptr_buf: UnifiedBuffer<usize>,
-    mbufs: Vec<Mbuf>,
+
+    bufs: WorkerBufs,
+
+    ports: WorkerPorts<'a>,
+
     temp_buf: Vec<*mut ()>,
+    mbufs: Vec<Mbuf>,
+    num_packets: usize,
 }
 
-// SAFETY: I promise to only ever use this from the thread it came from
-unsafe impl Send for Worker {}
-
-impl Worker {
-    fn recv(&mut self, pq: &PortQueue) {
-        pq.receive_into(&mut self.temp_buf, &mut self.mbufs, self.max_capacity);
-
-        for (idx, pkt) in self.mbufs.iter().enumerate() {
-            self.pkt_ptr_buf[idx] = get_mbuf_data(pkt).as_ptr() as usize;
-        }
-
-        // println!("pkt_ptr_buf: {:?} {:?}", self.pkt_ptr_buf.as_unified_ptr(), &self.pkt_ptr_buf[0..self.mbufs.len()]);
-    }
-
-    fn split_data(&mut self) -> (&Stream, &mut UnifiedBuffer<u32>, &mut UnifiedBuffer<usize>, usize) {
-        (&self.stream, &mut self.result_buf, &mut self.pkt_ptr_buf, self.mbufs.len())
-    }
-}
-
-impl Drop for Worker {
-    fn drop(&mut self) {
-        let _ = self.stream.synchronize();
-    }
-}
-
-fn make_worker(max_capacity: usize) -> Result<Worker, Box<dyn Error>> {
-    let stream = Arc::new(Stream::new(StreamFlags::NON_BLOCKING, None)?);
-    let result_buf = UnifiedBuffer::new(&0u32, max_capacity)?;
-    let pkt_ptr_buf = UnifiedBuffer::new(&0usize, max_capacity)?;
-    let mbufs = Vec::with_capacity(max_capacity);
-    let temp_buf = Vec::with_capacity(max_capacity);
-
-    Ok(Worker {
-        max_capacity: max_capacity as u16,
-        stream,
-        result_buf,
-        pkt_ptr_buf,
-        mbufs,
-        temp_buf,
-    })
-}
-
-pub struct Coordinator {
-    workers: Receiver<Worker>,
-    returner: Sender<Worker>,
-    module: Module,
-}
+// SAFETY: we only every access this from one thread at a time
+unsafe impl<'a> Send for Worker<'a> {}
 
 fn get_mbuf_data(buf: &dpdk::Mbuf) -> &mut [u8] {
     unsafe {
@@ -66,55 +54,210 @@ fn get_mbuf_data(buf: &dpdk::Mbuf) -> &mut [u8] {
     }
 }
 
-impl Coordinator {
-    pub fn new(max_capacity: usize, max_concurrency: usize) -> Result<Self, Box<dyn Error>> {
-        let (returner, workers) = channel();
+impl<'a> Worker<'a> {
+    fn recv(&mut self, pq: &PortQueue, port_idx: u32) {
+        pq.receive_into(&mut self.temp_buf, &mut self.mbufs, self.max_capacity);
+        self.num_packets = self.mbufs.len();
 
-        for _ in 0..max_concurrency {
-            returner.send(make_worker(max_capacity)?)?;
+        for (idx, pkt) in self.mbufs.iter().enumerate() {
+            let mbuf_data = get_mbuf_data(pkt);
+            let length = mbuf_data.len();
+            self.bufs.pkt_ptrs[idx] = unsafe { UnifiedPointer::wrap(mbuf_data.as_mut_ptr()) };
+            self.bufs.metas[idx] = Metadata::new(length as u32, port_idx);
+            self.bufs.lengths_in[idx] = length;
+        }
+
+        // println!("pkt_ptr_buf: {:?} {:?}", self.pkt_ptr_buf.as_unified_ptr(), &self.pkt_ptr_buf[0..self.mbufs.len()]);
+    }
+
+    fn split(&mut self) -> (&mut Vec<Mbuf>, &mut WorkerBufs, &mut WorkerPorts<'a>) {
+        (&mut self.mbufs, &mut self.bufs, &mut self.ports)
+    }
+
+    fn flush(&mut self) {
+        for port in &mut self.ports.ports {
+            port.flush();
+        }
+
+        if !self.ports.drop_queue.is_empty() {
+            self.ports.dropped_packets += self.ports.drop_queue.len();
+
+            Mbuf::free_bulk(std::mem::replace(&mut self.ports.drop_queue, Vec::new()));
+        }
+    }
+}
+
+impl<'a> Drop for Worker<'a> {
+    fn drop(&mut self) {
+        let _ = self.stream.synchronize();
+    }
+}
+
+fn make_worker<'a>(
+    ports: &[&'a PortQueue],
+    max_capacity: usize,
+) -> Result<Worker<'a>, Box<dyn Error>> {
+    let ports = ports.into_iter().cloned().map(PortInfo::new).collect();
+
+    let stream = Arc::new(Stream::new(StreamFlags::NON_BLOCKING, None)?);
+
+    let pkt_ptrs = UnifiedBuffer::new(&UnifiedPointer::null(), max_capacity)?;
+    let metas = UnifiedBuffer::new(&Metadata::default(), max_capacity)?;
+    let lengths_in = UnifiedBuffer::new(&0usize, max_capacity)?;
+    let lengths_out = UnifiedBuffer::new(&0usize, max_capacity)?;
+    let out_offsets = UnifiedBuffer::new(&0usize, max_capacity)?;
+
+    let temp_buf = Vec::with_capacity(max_capacity);
+    let mbufs = Vec::with_capacity(max_capacity);
+    let drop_queue = Vec::new();
+
+    Ok(Worker {
+        ports: WorkerPorts {
+            ports,
+            drop_queue,
+            dropped_packets: 0,
+        },
+        max_capacity: max_capacity as u16,
+        stream,
+        bufs: WorkerBufs {
+            pkt_ptrs,
+            metas,
+            lengths_in,
+            lengths_out,
+            out_offsets,
+        },
+        temp_buf,
+        mbufs,
+        num_packets: 0,
+    })
+}
+
+pub struct Coordinator<'a> {
+    worker_map: Arc<Vec<Mutex<Worker<'a>>>>,
+    workers: Receiver<usize>,
+    returner: SyncSender<usize>,
+    num_workers: usize,
+    module: Module,
+}
+
+impl<'a> Coordinator<'a> {
+    pub fn new(
+        ports: &'a [&'a PortQueue],
+        max_capacity: usize,
+        max_concurrency: usize,
+    ) -> Result<Self, Box<dyn Error>> {
+        let (returner, workers) = sync_channel(max_concurrency);
+
+        let mut worker_map = Vec::new();
+
+        for idx in 0..max_concurrency {
+            worker_map.push(Mutex::new(make_worker(ports, max_capacity)?));
+            returner.send(idx)?;
         }
 
         let ptx = CString::new(include_str!(concat!(env!("OUT_DIR"), "/kernel.ptx")))?;
         let module = Module::load_from_string(&ptx)?;
 
-        Ok(Coordinator { workers, returner, module })
+        Ok(Coordinator {
+            worker_map: Arc::new(worker_map),
+            workers,
+            returner,
+            num_workers: max_concurrency,
+            module,
+        })
     }
 
-    pub fn process_packets(&self, pq: &PortQueue) -> Result<usize, Box<dyn Error>> {
-        let mut worker = self.workers.recv()?;
+    pub fn process_packets(&self, pq: &PortQueue, port_idx: u32) -> Result<usize, Box<dyn Error>> {
+        let worker_idx = self.workers.recv()?;
+        let mut worker = self.worker_map[worker_idx].lock().unwrap();
 
-        worker.recv(pq);
+        worker.recv(pq, port_idx);
 
-        let (stream, pkt_ptr_buf, result_buf, pkt_len) = worker.split_data();
+        // let (stream, pkt_ptr_buf, result_buf, pkt_len) = worker.split_data();
+        let num_packets = worker.num_packets;
+        let stream = worker.stream.clone();
         let module = &self.module;
 
         unsafe {
-            launch!(module.perform<<<pkt_len as u32, 1, 0, stream>>>(
-                pkt_ptr_buf.as_unified_ptr(),
-                result_buf.as_unified_ptr(),
-                pkt_len
+            launch!(module.p4_process<<<num_packets as u32, 1, 0, stream>>>(
+                worker.bufs.pkt_ptrs.as_unified_ptr(),
+                worker.bufs.metas.as_unified_ptr(),
+                worker.bufs.lengths_in.as_unified_ptr(),
+                worker.bufs.lengths_out.as_unified_ptr(),
+                worker.bufs.out_offsets.as_unified_ptr(),
+                num_packets,
+                port_idx as u64
             ))?;
         }
 
-
         let s_c = worker.stream.clone();
         let ret = self.returner.clone();
-        s_c.add_callback(Box::new(move |s: Result<(), rustacuda::error::CudaError>| {
-            // TODO: send packets
+        drop(worker);
+        let wm = self.worker_map.clone();
+        s_c.add_callback(Box::new(
+            move |s: Result<(), rustacuda::error::CudaError>| {
+                let mut worker = wm[worker_idx].lock().unwrap();
+                let (mbufs, bufs, ports) = worker.split();
 
-            // return the worker to the pool
-            let _ = ret.send(worker);
-        }))?;
+                for (i, mut pkt) in mbufs.drain(..).enumerate() {
+                    let length_in = bufs.lengths_in[i];
+                    let length_out = bufs.lengths_out[i];
+                    let offset_out = bufs.out_offsets[i];
+                    let meta = bufs.metas[i];
 
+                    if length_out < length_in {
+                        // packet is smaller:
+                        // in:  [HHHHDDDDD]
+                        // out: [0HHHDDDDD]
 
-        Ok(pkt_len)
+                        let _ = pkt.shrink(0, offset_out as usize);
+                    } else if length_out > length_in {
+                        // packet is migger
+                        // in:  [HHHHDDDDD]
+                        // out: [HHHHDDDDD]D
+                        // (I hope this is fine)
+                        let _ = pkt.extend(length_in as usize, (length_out - length_in) as usize);
+                    }
+
+                    match meta.output_action {
+                        Action::Emit => {
+                            ports.ports[meta.output_port as usize].add_to_queue(pkt);
+                        }
+                        Action::Drop => {
+                            ports.drop_queue.push(pkt);
+                        }
+                    }
+                }
+
+                worker.flush();
+
+                // return the worker to the pool
+                let _ = ret.send(worker_idx);
+            },
+        ))?;
+
+        Ok(num_packets)
     }
 
     /// make sure this is called, otherwise things will explode
     pub fn close(self) {
-        drop(self.returner);
-        while let Ok(v) = self.workers.recv() {
-            drop(v);
+        println!("closing coordinator");
+        for _ in 0..self.num_workers {
+            self.workers
+                .recv()
+                .expect("worker not received when closing");
+            // wait for all workers to complete
         }
+
+        for worker in self.worker_map.iter() {
+            let stream = { worker.lock().unwrap().stream.clone() };
+            let _ = stream.synchronize();
+        }
+
+        // make sure we drop the unified buffers here:
+
+        Arc::try_unwrap(self.worker_map)
+            .ok()
+            .expect("we need to free the workers on the main thread");
     }
 }

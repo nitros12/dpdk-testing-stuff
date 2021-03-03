@@ -121,7 +121,6 @@ dependencies = [
 [[package]]
 name = "capsule"
 version = "0.1.4"
-source = "git+https://github.com/nitros12/capsule.git?rev=d78f7110e474a87fd227e0ee9021b2b7f2cbfc6a#d78f7110e474a87fd227e0ee9021b2b7f2cbfc6a"
 dependencies = [
  "capsule-ffi",
  "capsule-macros",
@@ -143,7 +142,6 @@ dependencies = [
 [[package]]
 name = "capsule-ffi"
 version = "0.1.4"
-source = "git+https://github.com/nitros12/capsule.git?rev=d78f7110e474a87fd227e0ee9021b2b7f2cbfc6a#d78f7110e474a87fd227e0ee9021b2b7f2cbfc6a"
 dependencies = [
  "bindgen",
  "cc",
@@ -153,7 +151,6 @@ dependencies = [
 [[package]]
 name = "capsule-macros"
 version = "0.1.4"
-source = "git+https://github.com/nitros12/capsule.git?rev=d78f7110e474a87fd227e0ee9021b2b7f2cbfc6a#d78f7110e474a87fd227e0ee9021b2b7f2cbfc6a"
 dependencies = [
  "darling",
  "quote",
@@ -288,6 +285,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "cuda-sys"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b34be17513126fc87acdbb851bc430fdcdbfcd2945eb4e38171d4e1601cae6c3"
+
+[[package]]
 name = "darling"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -329,6 +332,8 @@ dependencies = [
  "capsule",
  "cc",
  "howlong",
+ "page_size",
+ "rustacuda",
 ]
 
 [[package]]
@@ -715,6 +720,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b631f7e854af39a1739f401cf34a8a013dfe09eac4fa4dba91e9768bd28168d"
 
 [[package]]
+name = "page_size"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eebde548fbbf1ea81a99b128872779c437752fb99f217c45245e1a61dcd9edcd"
+dependencies = [
+ "libc",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -819,6 +834,35 @@ name = "regex-syntax"
 version = "0.6.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26412eb97c6b088a6997e05f69403a802a92d520de2f8e63c2b65f9e0f47c4e8"
+
+[[package]]
+name = "rustacuda"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0791040f6a5783dc54dda2b37a7ba61c8e10b35078d8e2e21154c2039f7900e"
+dependencies = [
+ "bitflags",
+ "cuda-sys",
+ "rustacuda_core",
+ "rustacuda_derive",
+]
+
+[[package]]
+name = "rustacuda_core"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3858b08976dc2f860c5efbbb48cdcb0d4fafca92a6ac0898465af16c0dbe848"
+
+[[package]]
+name = "rustacuda_derive"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43ce8670a1a1d0fc2514a3b846dacdb65646f9bd494b6674cfacbb4ce430bd7e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "rustc-demangle"

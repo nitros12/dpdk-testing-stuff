@@ -13,3 +13,14 @@
 
 ** PHF stuff
 http://cmph.sourceforge.net/chd.html
+
+** testing
+- vary packet size
+  - exponential increase: 64, 128, 256, ...
+- vary lookup table size
+- vary number of threads/ batch size
+- vary how many headers are being parsed
+
+
+- compare cpu & gpu
+- plot graphs, confidence interval
