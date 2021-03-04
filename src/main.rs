@@ -1,10 +1,9 @@
 use capsule::{dpdk, Mbuf, PortQueue};
 use howlong::HighResolutionTimer;
+use structopt::StructOpt;
 use std::{
     collections::HashSet,
     error::Error,
-    ffi::c_void,
-    sync::atomic::{AtomicUsize, Ordering},
     time::{Duration, Instant},
 };
 
@@ -218,7 +217,16 @@ fn process_once(
     (pkt_count, elapsed)
 }
 
+#[derive(Debug, StructOpt)]
+#[structopt(name = "dpdk-gpu")]
+struct Opt {
+    #[structopt(short, long)]
+    source: String,
+}
+
 fn main_inner() -> Result<(), Box<dyn Error>> {
+    let opt = Opt::from_args();
+
     let conf = capsule::config::RuntimeConfig {
         app_name: "test".to_owned(),
         secondary: false,
@@ -229,7 +237,7 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
         ports: vec![capsule::config::PortConfig {
             name: "testPort0".to_owned(),
             device: "net_pcap0".to_owned(),
-            args: Some("rx_pcap=dump2.pcap".to_owned()),
+            args: Some(format!("rx_pcap={}", opt.source)),
             cores: vec![dpdk::CoreId::new(0)],
             rxd: 128,
             txd: 128,
@@ -258,7 +266,7 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
         .map(|p| {
             dpdk::PortBuilder::new(p.name.clone(), p.device.clone())?
                 .cores(&p.cores)?
-                .mempools(&mut mempools)
+                .mempools(&mut mempools, &[])
                 .rx_tx_queue_capacity(p.rxd, p.txd)?
                 .finish(p.promiscuous, p.multicast, p.kni)
         })
