@@ -1,0 +1,125 @@
+#+TITLE: DPDK-GPU Info
+
+
+* Differing packet payload lengths
+#+TBLNAME: varying-payload-size-gpu
+| Payload Size | Packets per second |
+|--------------+--------------------|
+|            0 |             521250 |
+|           64 |             513450 |
+|          128 |             507276 |
+|          256 |             482832 |
+|          512 |             481137 |
+|         1024 |             453081 |
+
+#+TBLNAME: varying-payload-size-cpu
+| Payload Size | Packets per second |
+|--------------+--------------------|
+|            0 |              15034 |
+|           64 |              14921 |
+|          128 |              15013 |
+|          256 |              15065 |
+|          512 |              15126 |
+|         1024 |              15178 |
+
+#+begin_src python :var data0=varying-payload-size-gpu data1=varying-payload-size-cpu :results file
+import matplotlib.pyplot as plt
+
+x0, y0 = zip(*data0)
+x1, y1 = zip(*data1)
+
+plt.plot(x0, y0, label="gpu")
+plt.plot(x1, y1, label="cpu")
+
+plt.ylabel("Packets per second")
+plt.xlabel("Payload size")
+
+plt.ylim(ymin=0)
+plt.tight_layout()
+plt.legend(loc="best")
+
+filename = "./images/varying-payload-size-gpu.png"
+plt.savefig(filename)
+return filename
+#+end_src
+
+#+RESULTS:
+[[file:./images/varying-payload-size-gpu.png]]
+
+* Differing table sizes
+Can't take measurements for >510, compiler takes too long.
+
+#+TBLNAME: varying-table-size-gpu
+| Table Entries | Packets per second |
+|---------------+--------------------|
+|             2 |             535466 |
+|            27 |             573135 |
+|           255 |             507276 |
+|           510 |             592096 |
+
+#+TBLNAME: varying-table-size-cpu
+| Table Entries | Packets per second |
+|---------------+--------------------|
+|             2 |              14922 |
+|            27 |              14878 |
+|           255 |              15022 |
+|           510 |              14981 |
+
+#+begin_src python :var data0=varying-table-size-gpu data1=varying-table-size-cpu :results file
+import matplotlib.pyplot as plt
+
+x0, y0 = zip(*data0)
+x1, y1 = zip(*data1)
+
+plt.plot(x0, y0, label="gpu")
+plt.plot(x1, y1, label="cpu")
+
+plt.ylabel("Packets per second")
+plt.xlabel("Table size")
+
+plt.ylim(ymin=0)
+plt.tight_layout()
+plt.legend(loc="best")
+
+filename = "./images/varying-table-size-gpu.png"
+plt.savefig(filename)
+return filename
+#+end_src
+
+* Differing batch sizes
+Can't take measurements for batch size < 64, takes too long.
+
+#+TBLNAME: varying-batch-size-gpu
+| Batch Size | Packets per second |
+|------------+--------------------|
+|         16 |             126375 |
+|         32 |             182524 |
+|         64 |             292869 |
+|        128 |             425473 |
+|        256 |             488608 |
+|        512 |             616112 |
+|        768 |             637102 |
+|       1024 |             826526 |
+|       1536 |             822985 |
+
+#+begin_src python :var data0=varying-batch-size-gpu :results file
+import matplotlib.pyplot as plt
+
+x0, y0 = zip(*data0)
+
+plt.plot(x0, y0, label="gpu")
+
+plt.ylabel("Packets per second")
+plt.xlabel("Batch size")
+
+plt.ylim(ymin=0)
+plt.tight_layout()
+plt.legend(loc="best")
+
+filename = "./images/varying-batch-size-gpu.png"
+plt.savefig(filename)
+return filename
+#+end_src
+
+#+RESULTS:
+[[file:./images/varying-batch-size-gpu.png]]

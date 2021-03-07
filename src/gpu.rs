@@ -3,7 +3,6 @@ use rustacuda::prelude::*;
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::error::Error;
-use page_size;
 
 pub fn init() -> Result<(Device, Context), Box<dyn Error>> {
     rustacuda::init(CudaFlags::empty())?;
@@ -29,9 +28,8 @@ pub fn calc_total_pages(capacity: usize, mbuf_size: usize, page_size: usize) -> 
     let mbuf_mem = n_pages * page_size;
 
     let total_mem_unaligned = mbuf_mem + header_len;
-    let total_pages = (total_mem_unaligned + page_size - 1) / page_size;
 
-    total_pages
+    (total_mem_unaligned + page_size - 1) / page_size
 }
 
 pub fn allocate_gpu_mempool(

@@ -2,6 +2,7 @@ use rustacuda::memory::DeviceCopy;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum Action {
     Emit = 1,
     Drop = 0,

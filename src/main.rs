@@ -1,24 +1,23 @@
-use capsule::{dpdk, Mbuf, PortQueue};
-use howlong::HighResolutionTimer;
-use std::{
-    collections::HashSet,
-    error::Error,
-    ffi::c_void,
-    sync::atomic::{AtomicUsize, Ordering},
-    time::{Duration, Instant},
-};
+use capsule::dpdk;
+use std::{collections::HashSet, error::Error, time::Instant};
+use structopt::StructOpt;
 
+mod coordinator;
 mod gpu;
 mod meta;
-mod coordinator;
 mod portinfo;
 
-use crate::meta::{Metadata, Action};
-use crate::portinfo::PortInfo;
-
+#[derive(Debug, StructOpt)]
+#[structopt(name = "dpdk-gpu")]
+struct Opt {
+    #[structopt(short, long)]
+    source: String,
+}
 
 fn main_inner() -> Result<(), Box<dyn Error>> {
-    let (device, _context) = gpu::init()?;
+    let opt = Opt::from_args();
+
+    let (_device, _context) = gpu::init()?;
 
     let conf = capsule::config::RuntimeConfig {
         app_name: "test".to_owned(),
@@ -30,7 +29,7 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
         ports: vec![capsule::config::PortConfig {
             name: "testPort0".to_owned(),
             device: "net_pcap0".to_owned(),
-            args: Some("rx_pcap=dump2.pcap".to_owned()),
+            args: Some(format!("rx_pcap={}", opt.source)),
             cores: vec![dpdk::CoreId::new(0)],
             rxd: 128,
             txd: 128,
@@ -48,7 +47,6 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
 
     let sockets = cores.iter().map(|c| c.socket_id()).collect::<HashSet<_>>();
 
-
     let (bufs_and_sockets, mut mempools): (Vec<_>, Vec<_>) = sockets
         .into_iter()
         // .map(|s| dpdk::Mempool::new(conf.mempool.capacity, conf.mempool.cache_size, s))
@@ -57,7 +55,7 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
         .into_iter()
         .unzip();
 
-    let (bufs, sockets): (Vec<_>, Vec<_>) = bufs_and_sockets.into_iter().unzip();
+    let (_bufs, sockets): (Vec<_>, Vec<_>) = bufs_and_sockets.into_iter().unzip();
 
     let extra_heap_mappings = cores
         .iter()
@@ -83,7 +81,7 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
         port.start()?;
     }
 
-    let packet_buf_size = 512;
+    let packet_buf_size = 16;
 
     let port_queues: Vec<_> = ports
         .iter()
@@ -91,36 +89,40 @@ fn main_inner() -> Result<(), Box<dyn Error>> {
         .collect();
     let queue = ports.first().unwrap().queues().values().next().unwrap();
 
-    let start_t = Instant::now();
-    let mut total_pkts = 0;
-
     println!("making coordinator");
 
-    let coordinator = coordinator::Coordinator::new(&port_queues, 512, 8)?;
+    let coordinator = coordinator::Coordinator::new(&port_queues, packet_buf_size, 8)?;
 
     println!("receiving packets");
+
+    let start_t = Instant::now();
 
     loop {
         let n_pkts = coordinator.process_packets(queue, 0)?;
 
-        total_pkts += n_pkts;
-
         if n_pkts < packet_buf_size {
             break;
         }
+
     }
 
-    coordinator.close();
+    println!("huh");
+
+    let (total_emitted_packets, total_dropped_packets) = coordinator.close();
+
+    let total_processed_packets = total_emitted_packets + total_dropped_packets;
 
     let total_duration = start_t.elapsed();
 
     let total_secs = (total_duration.as_nanos() as f64) / 1_000_000_000f64;
 
     println!(
-        "done, took: {:?} total, {} packets, {} pkt/s",
+        "done, took: {:?} total, {} packets ({} emitted, {} dropped), {} pkt/s",
         total_duration,
-        total_pkts,
-        total_pkts as f64 / total_secs
+        total_processed_packets,
+        total_emitted_packets,
+        total_dropped_packets,
+        total_processed_packets as f64 / total_secs
     );
 
     for port in &mut ports {
